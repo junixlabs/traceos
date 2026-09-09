@@ -1,0 +1,89 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Test on Python ${{ matrix.python }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - run: pip install --disable-pip-version-check pyyaml jsonschema
+      - name: Stress tests, invariants and tooling
+        run: python3 tests/run_tests.py -v
+
+  model:
+    name: Validate the reference models
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0          # observations are checked against history
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install --disable-pip-version-check pyyaml jsonschema
+      - name: examples/ecommerce
+        run: |
+          python3 tools/traceos.py validate examples/ecommerce \
+            --repo-files examples/ecommerce/repo-files.txt
+      - name: examples/traceos-itself — TraceOS modelling TraceOS
+        run: |
+          git ls-files '*.py' '*.md' '*.json' \
+            | grep -v '^examples/traceos-itself/' > /tmp/repo-files.txt
+          python3 tools/traceos.py validate examples/traceos-itself \
+            --repo-files /tmp/repo-files.txt --repo .
+      - name: Every evidence locator must point at something that exists
+        run: python3 tools/check_locators.py examples/traceos-itself
+
+  lint:
+    name: Lint and schema
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install --disable-pip-version-check ruff jsonschema pyyaml
+      - name: ruff
+        run: ruff check tools tests
+      - name: ruff format
+        run: ruff format --check tools tests
+      - name: JSON Schema is itself valid
+        run: |
+          python3 - <<'PY'
+          import json, jsonschema
+          s = json.load(open("schema/traceos.schema.json"))
+          jsonschema.Draft202012Validator.check_schema(s)
+          print("schema ok")
+          PY
+
+  docs:
+    name: Docs consistency
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install --disable-pip-version-check pyyaml
+      - name: Every invariant is defined, cited and enforced
+        run: python3 tools/check_docs.py

@@ -1,0 +1,785 @@
+# TraceOS Semantic Specification v0.1
+
+> Trace before change. Reconcile after change.
+
+TraceOS is a semantic reasoning framework that lets agents understand software
+systems as behavioral graphs, trace semantic impact before change, and reconcile the
+system model with effective reality after change.
+
+Normative keywords MUST / MUST NOT / SHOULD / MAY are used in the RFC 2119 sense.
+
+Every rule in this document carries a stable id `INV-nnn`. The agent-facing digest of
+these rules lives in [`../skills/reference/`](../skills/reference/README.md); the
+rationale for each lives in [`decisions/`](decisions/README.md). This document is the
+definition; those two are the digest and the history.
+
+---
+
+## 1. The central mechanism
+
+TraceOS has exactly one integrity mechanism, applied three times:
+
+> **An authored claim is checked against a derived measurement.**
+
+| Authored claim | Derived measurement | Check |
+|---|---|---|
+| `confidence_asserted` | computed from the observation log | `asserted ≤ computed` |
+| `coverage_declared` | measured from artifact→node mapping | `complete ⇒ no gaps` |
+| Assertion claim | Effective Reality after resolution | `claim ≠ resolved ⇒ discrepancy` |
+
+**Reconciliation** is the act of closing a gap in this table.
+**Integrity** is whether any gap is open.
+
+Everything below exists to make those three rows computable.
+
+---
+
+## 2. Tiers
+
+### INV-001 THREE-TIER
+
+Every concept in TraceOS belongs to exactly one tier.
+
+| Tier | Concepts | Author | Storage |
+|---|---|---|---|
+| **AUTHORED** | System, Domain, Flow, Node, Relationship, State, External, Event, Context dimension, Assertion, `lifecycle`, `coverage_declared`, `confidence_asserted` | human or agent | `model/**.md`, reviewable |
+| **RECORDED** | Change, Reconciliation, Evidence Observation, Identity ledger entry | appended when something happens | `changes/`, `observations/`, `identity/` — append-only |
+| **DERIVED** | Effective Reality, Impact, Integrity, Confidence, measured Coverage, Artifact table, contradiction report | computed on demand | never stored |
+
+A DERIVED value appearing in an AUTHORED file MUST be a validation error, not a
+style preference.
+
+### INV-002 NO-REALITY-DOC
+
+There MUST NOT be a human-authored `reality.md` or `effective-reality.md`.
+
+Storing Reality creates a second model that can also go stale, which regresses
+infinitely. What is stored is the Assertion. Effective Reality is always the result
+of `resolve(assertions, context, time)`.
+
+The same argument forbids storing Impact (wrong the moment the graph changes),
+Integrity (`integrity: valid` in frontmatter is a self-issued certificate) and
+Confidence (§6.3).
+
+### 2.1 Who writes the RECORDED tier
+
+| Artifact | Written by | When |
+|---|---|---|
+| Evidence Observation | `understanding-system`, `reconciling-reality` | every time a reference is actually checked |
+| Change record | `tracing-change` opens, `reconciling-reality` closes | before and after implementation |
+| Identity ledger entry | `reconciling-reality` | on split / merge / replace |
+
+Append-only. Entries MUST NOT be edited or deleted.
+
+---
+
+## 3. System, Domain
+
+**System** is the boundary of what is modeled. Exactly one per model.
+
+**Domain** is a grouping for organisation only. It carries no behavioral semantics
+and participates in no traversal.
+
+### 3.1 The External test
+
+Something is **External** if you cannot change its behavior by editing this
+repository.
+
+The access mechanism is irrelevant. A service in the same monorepo you control is
+internal; a vendored library you cannot patch is closer to External than a REST
+endpoint you own.
+
+External / internal is relative to the System boundary, and MUST be re-evaluated
+when the boundary moves.
+
+---
+
+## 4. Behavioral vocabulary
+
+### 4.1 Flow
+
+> A Flow is a behavioral graph describing how the system operates from a trigger
+> toward one or more declared outcomes.
+
+A Flow has: `id`, `intent`, `trigger`, Nodes, Relationships, Outcomes,
+`coverage_declared`, `lifecycle`.
+
+A Flow is a graph, not necessarily a sequence.
+
+### 4.2 Node — INV-003
+
+A Node is a behavioral unit. Node types are exactly:
+
+`action` · `decision` · `event` · `interaction`
+
+There is **no** node type `state`.
+
+A Node MUST NOT be created mechanically from a class, a method, a controller, or an
+endpoint. Those are implementation structure. A Node exists when a distinguishable
+piece of *behavior* exists.
+
+### 4.3 State — INV-003
+
+State describes **what is true**, as `subject` + `value`.
+
+```
+Node  = What happens
+State = What is true
+```
+
+State MUST NOT be the source of any relationship — it is a passive fact.
+
+`retry_count = 3` is a State only if it is semantically significant: something
+`depends_on` it, or an Assertion refers to it.
+
+### 4.4 Event and Trigger — INV-004
+
+**Event** is a first-class entity. Many sources may emit it; many Flows may listen.
+
+**Trigger** is a *property* of a Flow, not an entity. It is a discriminated union:
+
+```yaml
+trigger: { kind: event,          ref: event.payment.succeeded }
+trigger: { kind: schedule,       semantic: "daily, off-peak" }
+trigger: { kind: state_change,   ref: state.order.confirmed }
+trigger: { kind: user_action,    actor: external.customer }
+trigger: { kind: external_event, ref: event.gateway.webhook }
+```
+
+`kind: schedule` carries semantics only. TraceOS MUST NOT require knowledge of the
+cron expression, Celery task, Laravel Scheduler, Kubernetes CronJob or systemd timer
+that implements it.
+
+### 4.5 Outcome — INV-015
+
+Outcomes are **explicitly declared by the Flow** and **bound to States**:
+
+```yaml
+outcomes:
+  - id: payment.success
+    states: [{ subject: payment, value: paid }]
+  - id: payment.partial
+    states: [{ subject: payment, value: paid }, { subject: notification, value: failed }]
+```
+
+A Flow MUST NOT have an overall SUCCESS/FAILED status. Multiple independent States
+may hold simultaneously.
+
+An Outcome MUST NOT be inferred from "a Node with no outgoing `next`". Such a Node
+may be an async branch, an event emission, an external interaction, incomplete
+modeling, a terminal state, or an intentionally disconnected node — topology cannot
+tell these apart.
+
+Outcome is a field of a Flow. It has no global namespace.
+
+Two symmetric findings:
+
+| Finding | Condition |
+|---|---|
+| `UNDECLARED_TERMINAL_NODE` | node has no outgoing `next` and appears in no Outcome |
+| `UNREACHABLE_OUTCOME` | no node `transitions_to` the full state set of a declared Outcome |
+
+The validator MUST warn and MUST NOT silently promote a terminal node to an Outcome.
+
+---
+
+## 5. Relationships
+
+### 5.1 The matrix — INV-006
+
+Rows are source, columns are target. Empty cell means invalid.
+
+| source ↓ \ target → | Flow | Node | State | Event | External |
+|---|---|---|---|---|---|
+| **Flow** | — | — | `depends_on` | — | `depends_on` |
+| **Node** | `invokes` | `next` | `transitions_to`, `depends_on` | `emits` | `interacts_with`, `depends_on` |
+| **State** | — | — | — | — | — |
+| **Event** | `triggers` | — | — | — | — |
+| **External** | — | — | — | `emits` | — |
+
+A relationship not in this table MUST be rejected. New relationship types MUST NOT be
+invented at authoring time.
+
+### 5.2 Semantics
+
+| Type | Meaning |
+|---|---|
+| `next` | ordering within one Flow; MAY carry `condition` |
+| `invokes` | synchronous delegation; the calling Node waits |
+| `triggers` | an Event starts a Flow |
+| `emits` | a Node or External produces an Event, with no knowledge of listeners |
+| `depends_on` | needs the target to be available or true |
+| `interacts_with` | exchange across the System boundary, including with humans |
+| `transitions_to` | the Node brings a State subject to a value |
+
+### 5.3 INV-007 NEXT-SAME-FLOW
+
+`next` MUST connect two Nodes in the **same** Flow. Cross-flow ordering is expressed
+with `invokes` or `triggers`, never with `next`.
+
+`condition` is available only on `next`. All other types may carry `when`
+(a context selector, §7).
+
+### 5.4 INV-005 EMITS-TRIGGERS
+
+```
+Node | External ──emits──> Event ──triggers──> Flow
+```
+
+`emits` MUST NOT target a Flow. `triggers` MUST NOT originate at a Node. An Event
+that appears to run a single Node runs a Flow whose entry point is that Node.
+
+### 5.5 INV-021 CONCURRENCY-BY-ABSENCE
+
+Concurrency is the **absence of `next`**. Two Flows triggered by the same Event are
+independent unless an explicit relationship orders them.
+
+There is no parallel construct, no fork/join entity, and asynchronous behavior MUST
+NOT be flattened into a linear `next` chain.
+
+### 5.6 Flow-level versus Node-level `depends_on`
+
+Use Node-level when a specific step touches the target. Use Flow-level only for a
+precondition that holds across the whole Flow.
+
+`Flow --depends_on--> External` is the edge that makes external change traceable:
+when an External changes behavior, dependent Flows are impacted with no local diff.
+
+### 5.7 `supersedes` is not a relationship — INV-014
+
+`supersedes` is identity history and crosses time. It is **entity metadata**, is not
+in the matrix, and MUST be excluded from every traversal. Including it would walk
+impact analysis into dead nodes.
+
+---
+
+## 6. Evidence, Observation, Assertion
+
+### 6.1 Evidence is two things
+
+Conflating them is the most common modeling error.
+
+| Half | What it is | Tier | Mutable |
+|---|---|---|---|
+| **Evidence Reference** | a pointer: artifact symbol, test name, config key, external contract | AUTHORED, on the Assertion | yes |
+| **Evidence Observation** | the *act of checking*, at a moment | RECORDED, append-only | no |
+
+A reference is a pointer; by itself it cannot say whether it still supports the
+claim. An observation is a fact about a moment and remains true forever as a
+statement about that moment.
+
+#### INV-022 LOCATOR-BY-SYMBOL
+
+```yaml
+evidence:
+  - kind: implementation   # | test | runtime | configuration
+                           # | external_contract | documentation
+    locator: "apps/api/src/payment/processor.ts#processPayment"
+```
+
+Locators MUST use symbol paths. Line numbers MUST NOT be used — refactoring destroys
+them, contradicting INV-013.
+
+#### INV-020 OBSERVATION-REQUIRED
+
+Every actual verification of a reference MUST append an observation:
+
+```yaml
+assertion: assert.payment.charges-gateway
+reference: "apps/api/src/payment/processor.ts#processPayment"
+observed_at: 2026-09-10T04:12:00Z
+observed_ref: "a1b2c3d"      # commit sha | trace id | doc version
+supports: supports           # | refutes | inconclusive
+observer: agent              # | human | ci
+```
+
+A `refutes` observation is as valuable as a supporting one and MUST be recorded.
+
+### 6.2 Assertion
+
+An Assertion is a claim the model makes:
+
+```yaml
+- id: assert.payment.routes-v2
+  claim: "payment is routed to gateway v2"
+  subject: payment.gateway          # for contradiction detection
+  when: { tenant: A }               # context selector, optional
+  lifecycle: current
+  evidence: [ ... references ... ]
+```
+
+The author writes `claim`, `subject`, `when`, `lifecycle`, and evidence references.
+
+### 6.3 INV-009 CONFIDENCE-DERIVED
+
+The author MUST NOT write `confidence`. It is computed:
+
+```
+computed_confidence(assertion, at_time):
+    obs   = observations(assertion) ordered by observed_at
+    if obs is empty                          -> uncertain
+    latest = obs[-1]
+    if latest.supports == refutes            -> uncertain
+    if latest.supports == inconclusive       -> uncertain
+    if age(latest) > staleness_window        -> likely
+    for each supporting observation o:
+        changed = artifact_changed_since(o.observed_ref, o.reference)
+        if changed is TRUE                   -> uncertain
+        if changed is UNKNOWN                -> cap at likely
+    if count(supports) >= 2 across >= 2 kinds-> confirmed
+    otherwise                                -> likely
+```
+
+`artifact_changed_since` returns TRUE, FALSE or UNKNOWN. **Unverifiable is not the
+same as verified**: an observation whose `observed_ref` is not in the repository
+caps confidence at `likely` and MUST be reported (`OBSERVED_REF_UNVERIFIABLE`),
+never silently trusted. When no repository is available the check is skipped, and
+the tool MUST say that it was skipped.
+
+`staleness_window` is a model-level setting; the reference implementation uses 90
+days.
+
+A human override `confidence_asserted` MAY be written. The validator MUST check
+`asserted ≤ computed` on the ordering `uncertain < likely < confirmed`. This turns
+"Confidence ≤ Evidence support" from advice into a check.
+
+**Test of the mechanism:** confidence must be able to fall with nobody editing a
+file. It does, because observations carry time and a ref.
+
+### 6.4 Evidence sources have no universal ranking
+
+Strength is claim-dependent. A test is strong evidence for "this branch exists" and
+weak evidence for "this is what production does".
+
+---
+
+## 7. Context
+
+### INV-008 CONTEXT-NOFORK
+
+> Context selects which assertion or relationship is applicable.
+> Context does not create another graph.
+
+A Context is a set of named dimensions — `env`, `tenant`, `flag.*`, `role`, and
+others declared by the model. Assertions and Relationships MAY carry `when`.
+
+```yaml
+- claim: "payment routed to gateway v2"
+  when: { tenant: A }
+- claim: "payment routed to gateway v1"
+  when: { tenant: B }
+```
+
+Forking the graph per context is forbidden: `tenant × env × flag × role` explodes
+combinatorially. There MUST NOT be `production/`, `tenant-a/` or `flag-on/`
+directories.
+
+A selector matches a context when every dimension it names is satisfied. A selector
+with no dimensions matches every context.
+
+### 7.1 Contradiction
+
+Two assertions with the same `subject`, **overlapping** selectors and different
+claims are a contradiction and MUST be reported.
+
+Non-overlapping selectors are not a contradiction — that is context-dependent
+behavior and is valid.
+
+---
+
+## 8. Lifecycle and Effective Reality
+
+### INV-016 CURRENT-ONLY-RESOLVES
+
+```
+Assertions → filter lifecycle == current → filter context match → Effective Reality
+```
+
+`proposed` and `planned` MUST NOT participate in resolution.
+
+```
+Current:            Payment → Gateway V1
+Proposed:           Payment → Gateway V2
+Effective Reality:  Payment → Gateway V1
+```
+
+until an observation establishes V2 as effective. Without this rule a proposed flow
+reads as a behavior change that already happened.
+
+### INV-017 DEPRECATED-BINARY
+
+`deprecated` means **not effective anywhere** and never contributes. There is no
+`include_deprecated` flag and no exception clause.
+
+There is no ambiguous case: if a behavior is still effective for tenant B then by
+definition it is `current` under that context —
+
+```yaml
+lifecycle: current
+when: { tenant: B }
+```
+
+The lifecycle was mislabelled; the resolver is not missing anything.
+
+### INV-018 NO-HEALTH
+
+Runtime health is out of scope for v0.1. TraceOS asks *what is the system's
+behavior*; health asks *is the running system healthy*. Uptime, latency, CPU, memory,
+availability and incident state belong to monitoring, which §Non-goals excludes.
+
+Two judgement scales remain, both DERIVED:
+
+| Scale | Judges |
+|---|---|
+| Confidence | one Assertion — how far the claim is supported |
+| Integrity | the model — whether it still matches evidence |
+
+Integrity does not mean bug-free, healthy, performant or available:
+
+> Payment has a bug. Reality: payment fails. Model: payment fails.
+> **Integrity = VALID**, even though the software is wrong.
+
+### 8.1 resolve()
+
+```
+resolve(model, context, at_time) -> EffectiveReality:
+    applicable = [ a for a in model.assertions
+                   if a.lifecycle == current
+                   and selector_matches(a.when, context) ]
+
+    for each subject in applicable:
+        candidates = assertions for that subject
+        if more than one candidate with overlapping selectors and different claims:
+            emit CONTRADICTION ; subject resolves to UNCERTAIN
+        else:
+            value      = the single candidate's claim
+            confidence = computed_confidence(candidate, at_time)
+
+    return { subject -> (value, confidence, supporting assertion) }
+```
+
+`resolve` MUST be deterministic: the same model, context and time produce the same
+result.
+
+---
+
+## 9. Identity
+
+### INV-013 ID-STABILITY
+
+TraceOS assigns stable **semantic** IDs. Git, file paths and parsers do not assign
+IDs.
+
+```
+ID  ≠  implementation identity  ≠  file identity
+```
+
+> A semantic entity ID identifies the semantic entity across implementation changes.
+> A new ID is required when the semantic identity changes.
+
+An ID MUST NOT change because a class was renamed, a method moved, files were
+reorganised, or code was refactored. A display name change does not change an ID. An
+ID MUST NOT be reused for a different meaning.
+
+**ID form:** dotted lowercase, `<kind>.<domain>.<name>`, e.g. `flow.payment`,
+`node.payment.process`, `state.order.confirmed`, `event.payment.succeeded`,
+`external.stripe`, `assert.payment.routes-v2`.
+
+### 9.1 The operational test
+
+The invariant above is circular without a decision procedure:
+
+> **An ID stays if every Assertion pointing at it is still the same claim.**
+
+A genuine split means the old claim set must be **partitioned** between two nodes.
+A refactor means every old claim still applies to one node.
+
+Identity is defined by the set of behavioral claims attached, not by a name.
+
+### 9.2 Split, merge, replace
+
+```yaml
+- id: node.payment.authorize
+  supersedes: [node.payment.process]
+- id: node.payment.capture
+  supersedes: [node.payment.process]
+```
+
+Merge uses the same mechanism with several entries. Superseded IDs live in the
+identity ledger (RECORDED); they MUST NOT remain as ghost nodes in a Flow file, or
+`supersedes` would dangle.
+
+### 9.3 Stated limitation
+
+**The validator cannot verify an identity decision.** It can only check that IDs are
+used consistently, not that the author was right to keep one.
+
+Therefore a graph diff is objective *conditional on IDs having been assigned
+correctly*. This is the point on which refactor-versus-behavior-change actually
+hangs, and reports MUST state it rather than leaving it implicit.
+
+---
+
+## 10. Change
+
+A Change is a RECORDED entry. Its categories are not mutually exclusive:
+
+`implementation` · `behavior` · `flow` · `structural` · `external` · `configuration`
+
+A Change is not necessarily a code change: an External changing its behavior is a
+Change with no local diff.
+
+Rollback is a Change producing a new Effective Reality. There MUST NOT be a Rollback
+entity.
+
+---
+
+## 11. Artifacts and the reverse index
+
+### 11.1 Artifact is DERIVED
+
+Nobody authors an Artifact. The Artifact table is the union of locators appearing in
+evidence references, computed by the parser. That table *is* the reverse index:
+
+```
+file / symbol → node[] → flow[] → related flow[] → external[] , state[]
+```
+
+Without it, "trace before change" has no starting point, because a change arrives as
+a diff.
+
+### 11.2 Polymorphism
+
+Implementations that differ in *how* and not in *what* are evidence on **one** Node,
+not several Nodes.
+
+```
+Select Provider (decision)
+  ├── next [provider=stripe] → Process Payment
+  ├── next [provider=paypal] → Process Payment
+  └── next [provider=adyen]  → Process Payment
+
+node.payment.process
+  evidence: [ StripeAdapter.charge, PayPalAdapter.charge, AdyenAdapter.charge ]
+```
+
+Modeling `Process Payment → StripeService / PayPalService / AdyenService` models
+class hierarchy, not behavior.
+
+---
+
+## 12. Impact
+
+### INV-019 IMPACT-NE-FILES
+
+Impact is the semantic scope potentially affected by a Change. It is not
+`changed_files[]`.
+
+Impact answers *where must the agent look*, not *what must the agent change*.
+
+```
+impact(model, change, depth=2) -> tiers:
+
+  seed = { nodes reachable from change.locators via the Artifact table }
+       ∪ { nodes and flows whose assertions cite changed config or a changed External }
+
+  unknown = { locator in change.locators with no node in the Artifact table }
+
+  traverse from seed, never through `supersedes`:
+      node   → containing flow
+      flow   → flows related by invokes / triggers, both directions
+      node   → states it transitions_to → nodes that depend_on those states
+      node   → externals it interacts_with → other nodes touching that external
+
+  certain = seed
+  likely  = frontier at distance 1
+  inspect = frontier at distance 2..depth
+  return { certain, likely, inspect, unknown }
+```
+
+Both directions of `invokes`/`triggers` are traversed: a callee change affects
+callers, and a caller change may violate the callee's preconditions.
+
+The result is a **frontier**, not a transitive closure. Every Impact output MUST
+carry all four tiers, including an empty `unknown`.
+
+`unknown` MUST NOT be interpreted as "no impact".
+
+---
+
+## 13. Coverage
+
+### INV-011 UNCERTAIN-NE-UNKNOWN
+
+| | Meaning | Detectable by |
+|---|---|---|
+| `UNCERTAIN` | an assertion exists, support is weak | reading the model |
+| `UNKNOWN` / `UNMODELED` | no assertion exists for this area | derived tier only |
+
+### INV-010 COVERAGE-NEEDS-REPO
+
+**Absence is not in the model**, so UNMODELED can never be found by reading the
+model. A coverage query MUST take the repository file list as input.
+
+### 13.1 Declared versus measured
+
+`coverage_declared: complete | partial | stub` on a Flow is an authored claim and can
+be wrong. Measured coverage is derived from the artifact mapping and observation
+freshness. `declared = complete` with measured gaps is a contradiction.
+
+`partial` is a normal state, not a defect. A model starts at one Flow and grows.
+
+### INV-012 NO-PERCENT-COVERAGE
+
+Coverage MUST be reported as counts and named gaps. A percentage MUST NOT be shown.
+
+Full artifact mapping does not mean behavior is fully modeled — an artifact can map
+to a node while an entire behavioral branch is absent. Coverage measures mapping
+density and observation freshness; behavioral completeness is not measurable from
+inside the model.
+
+```
+Coverage
+├── flows modeled: 4 (2 complete, 2 partial)
+├── artifacts mapped: 37
+├── artifacts unmapped: 12
+│   └── src/refund/**, src/webhooks/retry.ts
+└── assertions with no observation < 90d: 6
+```
+
+---
+
+## 14. Reconciliation and Integrity
+
+### 14.1 Reconciliation
+
+```
+Evidence → Observation → Assertion → resolve(Context, Time)
+        → compare with Model → discrepancy → update Model
+```
+
+Triggered after a change, when an External changed, or when new evidence appears.
+
+Not every implementation change requires model modification. Implementation changed
+with behavior unchanged updates evidence locators only.
+
+### 14.2 Integrity
+
+```
+integrity(model, context, at_time):
+    findings = structural_validation(model)
+             + contradictions(model, context)
+             + confidence_overrides_exceeding_support(model)
+             + coverage_declared_vs_measured(model)
+
+    if any finding is an error        -> INVALID
+    if any assertion resolves UNCERTAIN
+       or coverage reports unknown areas -> UNCERTAIN
+    otherwise                          -> VALID
+```
+
+Integrity is computed and reported, never authored or decided.
+
+---
+
+## 15. Representation
+
+Markdown with YAML frontmatter. The frontmatter is the model; the body is rationale
+for humans. JSON Schema validates the frontmatter's **structure**; this document
+defines its **semantics**.
+
+### 15.1 Layout — one Flow, one file
+
+```
+model/
+├── system.md
+├── contexts.md
+├── externals.md
+├── events.md
+└── flows/
+    ├── purchase.md
+    ├── payment.md
+    └── notification.md
+
+observations/*.jsonl     RECORDED, machine-written, append-only
+changes/*.jsonl          RECORDED
+identity/ledger.jsonl    RECORDED
+```
+
+The agent's incremental unit of reasoning is one Flow, so one Flow is one file. Nodes
+are declared inline in the Flow that owns them and referenced elsewhere by global ID.
+Physical file structure need not mirror graph structure.
+
+Observations are excluded from Flow files: they are machine-written and append-only,
+and keeping them inline would dirty every authored file on each reconciliation and
+create merge conflicts.
+
+### 15.2 Flow file shape
+
+```markdown
+---
+id: flow.payment
+type: flow
+domain: payment
+lifecycle: current
+coverage_declared: partial
+trigger: { kind: event, ref: event.payment.requested }
+nodes:
+  - { id: node.payment.process, type: action, name: Process Payment }
+relationships:
+  - { type: transitions_to, source: node.payment.process, target: state.payment.paid }
+outcomes:
+  - { id: payment.success, states: [{ subject: payment, value: paid }] }
+assertions:
+  - id: assert.payment.charges-gateway
+    claim: "..."
+    subject: payment.gateway
+    lifecycle: current
+    evidence: [{ kind: implementation, locator: "src/payment.ts#charge" }]
+---
+
+## Intent
+Prose for humans. Not parsed.
+```
+
+---
+
+## 16. Non-goals
+
+TraceOS v0.1 is not an IDE, a Git replacement, an APM, a test framework, a
+documentation generator, a UML replacement, a code dependency analyzer, a runtime
+monitoring platform, or an AI model. It may consume any of these as Evidence.
+
+Two things are deliberately outside the skill set as well: **implementation**, which
+is the agent's ordinary coding work between tracing and reconciling, and the
+**validator**, which is an engine capability rather than a skill so that invariants
+are enforced mechanically instead of by careful reading.
+
+---
+
+## Appendix A — Invariant index
+
+| Id | Rule | §  |
+|---|---|---|
+| INV-001 | Three tiers; derived values never authored | 2 |
+| INV-002 | No authored Reality document | 2 |
+| INV-003 | No `state` node type; State is an entity, never a source | 4.2, 4.3 |
+| INV-004 | Event is an entity; Trigger is a Flow property | 4.4 |
+| INV-005 | `emits` → Event → `triggers` → Flow | 5.4 |
+| INV-006 | Relationships must be in the matrix | 5.1 |
+| INV-007 | `next` connects nodes in the same Flow | 5.3 |
+| INV-008 | Context selects; it does not fork the graph | 7 |
+| INV-009 | Confidence is derived; `asserted ≤ computed` | 6.3 |
+| INV-010 | Coverage requires the repository file list | 13 |
+| INV-011 | UNCERTAIN ≠ UNKNOWN | 13 |
+| INV-012 | No coverage percentages | 13 |
+| INV-013 | Semantic IDs are stable; claim-partition test | 9 |
+| INV-014 | `supersedes` is out of the graph | 5.7 |
+| INV-015 | Outcomes are declared and bound to States | 4.5 |
+| INV-016 | Only `current` resolves | 8 |
+| INV-017 | `deprecated` is binary | 8 |
+| INV-018 | No runtime health | 8 |
+| INV-019 | Impact ≠ changed files; four tiers | 12 |
+| INV-020 | Every verification appends an observation | 6.1 |
+| INV-021 | Concurrency is the absence of `next` | 5.5 |
+| INV-022 | Locators use symbols, not line numbers | 6.1 |

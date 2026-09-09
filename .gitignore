@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+explore.html
+.playwright-mcp/
+*.egg-info/
+.forge/

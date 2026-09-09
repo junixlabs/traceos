@@ -1,0 +1,21 @@
+[project]
+name = "traceos"
+version = "0.1.0"
+description = "A semantic reasoning framework that lets AI agents trace semantic impact before a change and reconcile the model with reality after it"
+readme = "README.md"
+license = { file = "LICENSE" }
+requires-python = ">=3.11"
+dependencies = ["pyyaml>=6", "jsonschema>=4"]
+
+[project.urls]
+Homepage = "https://github.com/junixlabs/traceos"
+Specification = "https://github.com/junixlabs/traceos/blob/main/docs/semantic-specification.md"
+
+[tool.ruff]
+line-length = 90
+target-version = "py311"
+extend-exclude = ["examples"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM", "C4", "RUF"]
+ignore = ["E501"]
