@@ -99,6 +99,23 @@ Do not look for an `until:` field. Decay is derived — nobody wrote it, so nobo
 carry an exit condition for it, and the exit is already known: re-verify against the
 new content.
 
+## INV-025 BOUNDARY-NOT-SILENT
+
+Every scope you declare has to answer what happens to a thing that leaves it, and
+the answer is never silence.
+
+Narrowing what is gated is legitimate — it is what makes the ratchet adoptable.
+Reporting an excluded thing as an absent thing is not, because the output looks
+identical and only one reading is true.
+
+- `--scope` reports `out_of_scope` — counted.
+- `--decay-scope` reports `excluded` — named, so an assertion whose artifact moved
+  out of the scope lapses visibly instead of disappearing.
+
+Found twice from opposite directions before it was written down: a diff path in the
+wrong coordinates landing in `unknown`, and a decay obligation vanishing with its
+artifact. Both invisible.
+
 ## INV-012 NO-PERCENT-COVERAGE
 
 **Never report a percentage. Never draw a green 100% bar.**

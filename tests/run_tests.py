@@ -1545,6 +1545,17 @@ def tool_decay_ratchet():
         out["undischarged"] == [] and out["uncertain"] == [],
         str(out),
     )
+    check(
+        "TOOL decay",
+        "INV-025: what the scope excluded is named, never reported as absent",
+        out["excluded"] == ["assert.retry.scheduled"],
+        str(out),
+    )
+    check(
+        "TOOL decay",
+        "an assertion inside the scope is gated, not excluded",
+        T.decay_ratchet(model, [], NOW, None, ["deploy/"], 99)["excluded"] == [],
+    )
 
 
 def tool_anchor_rot():

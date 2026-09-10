@@ -1055,6 +1055,11 @@ def decay_ratchet(
 
     `baseline` is a caller's number, never a field in the model: a count is DERIVED
     and an authored copy of it would go stale exactly as INV-001 says.
+
+    INV-025: an uncertain assertion the scope excludes is reported as `excluded`,
+    not omitted. Gating it would be dishonest - the scope is a declaration that it
+    is not gated yet - but reporting zero would be worse, because an artifact
+    moving out of the scope would make its obligation disappear rather than lapse.
     """
     prefix = model.repo_prefix()
 
@@ -1065,13 +1070,15 @@ def decay_ratchet(
         return any(clean.startswith(_norm_path(s).rstrip("/")) for s in scope)
 
     changed_clean = [_norm_path(c) for c in changed]
-    uncertain, touched = [], []
+    uncertain, touched, excluded = [], [], []
     for aid, assertion in model.assertions.items():
         locators = [ev["locator"] for ev in assertion.get("evidence") or []]
         cited = [loc for loc in locators if in_scope(_repo_path(loc, prefix))]
-        if not cited:
-            continue
         if computed_confidence(model, aid, at_time, git) != "uncertain":
+            continue
+        if not cited:
+            if locators:
+                excluded.append(aid)
             continue
         uncertain.append(aid)
         hits = [
@@ -1090,6 +1097,7 @@ def decay_ratchet(
         "baseline": baseline,
         "grew": grew,
         "undischarged": sorted(touched, key=lambda t: t["assertion"]),
+        "excluded": sorted(excluded),
     }
 
 
