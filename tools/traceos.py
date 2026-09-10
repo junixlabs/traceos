@@ -23,7 +23,6 @@ import json
 import pathlib
 import sys
 
-import engine
 import explore
 from engine import (
     Git,
@@ -31,6 +30,7 @@ from engine import (
     coverage,
     graph_diff,
     impact,
+    init,
     integrity,
     observe,
     resolve,
@@ -129,7 +129,7 @@ def main() -> int:
     if args.cmd == "init":
         repo = pathlib.Path(args.repo).resolve()
         out = pathlib.Path(args.out).resolve() if args.out else repo / "traceos"
-        files = engine.init(repo, out, args.name or repo.name)
+        files = init(repo, out, args.name or repo.name)
         rel = out.relative_to(repo) if out.is_relative_to(repo) else out
         print(f"scaffolded {out}  ({len(files)} repository files indexed)")
         print("\nnext:")
