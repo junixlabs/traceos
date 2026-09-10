@@ -37,9 +37,15 @@ assertion: assert.payment.charges-gateway
 reference: "apps/api/src/payment/processor.ts#processPayment"
 observed_at: 2026-09-10T04:12:00Z
 observed_ref: "a1b2c3d"        # commit sha | trace id | doc version
+observed_blob: "9daeafb..."    # content hash of the artifact as checked
 supports: supports             # | refutes | inconclusive
 observer: agent                # | human | ci
 ```
+
+`observed_blob` is what makes the check survive the shape of your history. "Has a
+commit touched this file" is not the question — squashing a branch touches every file
+it changed, which would invalidate an observation by its own merge. The question is
+whether the artifact is still what you looked at.
 
 A `refutes` is worth as much as a `supports`. Record both.
 
