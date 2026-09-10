@@ -261,8 +261,22 @@ class Git:
     def head(self) -> str | None:
         return self._run("rev-parse", "HEAD")
 
-    def changed_since(self, ref: str, path: str) -> bool | None:
-        """spec 6.3 artifact_changed_since. None means it could not be determined."""
+    def blob(self, path: str) -> str | None:
+        """Content hash of the file as it is right now."""
+        return self._run("hash-object", "--", _norm_path(path))
+
+    def changed_since(self, ref: str, path: str, blob: str | None = None) -> bool | None:
+        """spec 6.3 artifact_changed_since. None means it could not be determined.
+
+        Content first, history second. History answers "did a commit touch this",
+        which is not the question: squashing a branch produces a commit that
+        re-touches every file it changed, so an observation recorded before the
+        merge would read as invalidated by its own merge. Content answers the
+        question actually being asked.
+        """
+        if blob:
+            current = self.blob(path)
+            return None if current is None else current != blob
         if self._run("cat-file", "-e", f"{ref}^{{commit}}") is None:
             return None
         out = self._run("rev-list", f"{ref}..HEAD", "--", _norm_path(path))
@@ -548,7 +562,11 @@ def computed_confidence(
         if git and git.available:
             ref = observation.get("observed_ref")
             if ref and reference:
-                changed = git.changed_since(ref, reference.split("#", 1)[0])
+                changed = git.changed_since(
+                    ref,
+                    reference.split("#", 1)[0],
+                    observation.get("observed_blob"),
+                )
                 if changed is True:
                     return "uncertain"
                 if changed is None:
@@ -633,7 +651,10 @@ def validate_confidence(
             if (
                 ref
                 and ref_path
-                and git.changed_since(ref, ref_path.split("#", 1)[0]) is None
+                and git.changed_since(
+                    ref, ref_path.split("#", 1)[0], observation.get("observed_blob")
+                )
+                is None
             ):
                 findings.append(
                     Finding(
@@ -1021,11 +1042,19 @@ def observe(
             "observation cannot be verified later (spec 6.3)"
         )
 
+    blob = git.blob(match.split("#", 1)[0])
+    if blob is None:
+        warnings.append(
+            f"could not hash '{match.split('#', 1)[0]}'; this observation falls back "
+            f"to history, which a squash or rebase will invalidate (spec 6.3)"
+        )
+
     entry = {
         "assertion": assertion_id,
         "reference": match,
         "observed_at": at_time.isoformat().replace("+00:00", "Z"),
         "observed_ref": ref,
+        "observed_blob": blob,
         "supports": supports,
         "observer": observer,
         "kind": kind or declared[match]["kind"],

@@ -337,6 +337,13 @@ to an address the claim no longer uses. A declared reference with no observation
 reported (`REFERENCE_NEVER_OBSERVED`), which is what surfaces a re-anchor that was
 never re-verified — and which clears once it is.
 
+`artifact_changed_since` compares the artifact's **content** to what it was when
+observed, and falls back to history only when no content hash was recorded. History
+answers "did a commit touch this file", which is not the question: squashing a branch
+produces a commit that re-touches every file the branch changed, so an observation
+recorded before the merge would read as invalidated by its own merge. An Evidence
+Observation therefore SHOULD record `observed_blob` alongside `observed_ref`.
+
 `artifact_changed_since` returns TRUE, FALSE or UNKNOWN. **Unverifiable is not the
 same as verified**: an observation whose `observed_ref` is not in the repository
 caps confidence at `likely` and MUST be reported (`OBSERVED_REF_UNVERIFIABLE`),

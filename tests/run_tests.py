@@ -1310,7 +1310,86 @@ def tool_explore():
     )
 
 
-TOOLING = [tool_init, tool_observe, tool_artifact_changed, tool_explore]
+def tool_content_not_history():
+    """spec 6.3: a commit that touches a file without changing it is not a change.
+
+    History answers "did a commit touch this". Squashing a branch produces a commit
+    that re-touches every file it changed, so an observation recorded before the
+    merge would read as invalidated by its own merge.
+    """
+    import subprocess
+
+    tmp = pathlib.Path(tempfile.mkdtemp(prefix="traceos-blob-"))
+    try:
+        git_repo(tmp)
+        out = tmp / "traceos"
+        T.init(tmp, out, "Demo")
+        flow = out / "model" / "flows" / "example.md"
+        flow.write_text(
+            flow.read_text().replace(
+                'locator: "path/to/File.ext#symbol"', 'locator: "src/svc.ts#run"'
+            )
+        )
+        git = T.Git(tmp)
+        T.observe(
+            out,
+            "assert.example.works",
+            "src/svc.ts#run",
+            "supports",
+            "agent",
+            None,
+            git,
+            NOW,
+        )
+        recorded = T.Model(out).observations[0]
+        check(
+            "TOOL content-not-history",
+            "an observation records the content hash, not only the commit",
+            bool(recorded.get("observed_blob")),
+            str(recorded.get("observed_blob")),
+        )
+
+        # touch the file in a commit, then restore byte-identical content
+        original = (tmp / "src" / "svc.ts").read_text()
+        commit_change(tmp, "src/svc.ts")
+        (tmp / "src" / "svc.ts").write_text(original)
+        for args in (("add", "src/svc.ts"), ("commit", "-m", "restore")):
+            subprocess.run(("git", "-C", str(tmp), *args), capture_output=True)
+
+        touched = git.changed_since(recorded["observed_ref"], "src/svc.ts")
+        check(
+            "TOOL content-not-history",
+            "history alone reports the file as changed",
+            touched is True,
+            str(touched),
+        )
+        by_content = git.changed_since(
+            recorded["observed_ref"], "src/svc.ts", recorded["observed_blob"]
+        )
+        check(
+            "TOOL content-not-history",
+            "content comparison reports it unchanged, because it is",
+            by_content is False,
+            str(by_content),
+        )
+        confidence = T.computed_confidence(T.Model(out), "assert.example.works", NOW, git)
+        check(
+            "TOOL content-not-history",
+            "so confidence survives a commit that changed nothing",
+            confidence != "uncertain",
+            confidence,
+        )
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+TOOLING = [
+    tool_init,
+    tool_observe,
+    tool_artifact_changed,
+    tool_content_not_history,
+    tool_explore,
+]
 
 
 def inv_confidence_per_reference():
@@ -1463,7 +1542,21 @@ INVARIANTS = [
 def main() -> int:
     verbose = "-v" in sys.argv
     for fn in CASES + INVARIANTS + TOOLING:
-        fn()
+        # A crash used to abort the run and print nothing, so a sabotaged engine
+        # could look like a passing suite. An exception is a failure of the group
+        # that raised it.
+        try:
+            fn()
+        except Exception as exc:
+            group = fn.__doc__.splitlines()[0] if fn.__doc__ else fn.__name__
+            RESULTS.append(
+                (
+                    f"!! {fn.__name__}",
+                    f"raised {type(exc).__name__}",
+                    False,
+                    f"{exc} — {group}",
+                )
+            )
 
     groups: dict[str, list[tuple[str, bool, str]]] = {}
     for group, name, ok, detail in RESULTS:
