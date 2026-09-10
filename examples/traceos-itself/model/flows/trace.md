@@ -31,7 +31,7 @@ assertions:
     lifecycle: current
     about: [node.trace.tier]
     evidence:
-      - { kind: implementation, locator: "tools/traceos.py#impact" }
+      - { kind: implementation, locator: "tools/engine.py#impact" }
       - { kind: test, locator: "tests/run_tests.py#inv_impact_ne_changed_files" }
       - { kind: documentation, locator: "docs/semantic-specification.md#INV-019 IMPACT-NE-FILES" }
   - id: assert.trace.unknown-is-not-safe
@@ -40,7 +40,7 @@ assertions:
     lifecycle: current
     about: [node.trace.resolve]
     evidence:
-      - { kind: implementation, locator: "tools/traceos.py#impact" }
+      - { kind: implementation, locator: "tools/engine.py#impact" }
       - { kind: test, locator: "tests/run_tests.py#inv_impact_ne_changed_files" }
 ---
 

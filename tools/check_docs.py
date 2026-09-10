@@ -32,7 +32,7 @@ def main() -> int:
         reference |= ids_in(path)
 
     engine: set[str] = set()
-    for name in ("traceos.py", "explore.py"):
+    for name in ("engine.py", "explore.py", "traceos.py"):
         engine |= ids_in(ROOT / "tools" / name)
 
     appendix = spec_text[spec_text.index("## Appendix A") :]
