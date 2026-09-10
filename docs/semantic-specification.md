@@ -708,6 +708,28 @@ obligation, and the two rules above are it.
 The baseline is a caller's number and MUST NOT be a field in the model: a count is
 DERIVED, and an authored copy of it goes stale exactly as INV-001 says.
 
+### 13.0.2 INV-025 BOUNDARY-NOT-SILENT
+
+Every boundary in the system MUST answer *what happens to a thing that crosses out
+of me*, and the answer MUST NOT be silence.
+
+A boundary — a `repo_prefix`, a `--scope`, a `--decay-scope` — narrows what is
+gated. That is legitimate and it is what makes any of this adoptable. What is not
+legitimate is reporting an excluded thing as an absent thing, because the two look
+identical in the output and only one of them is true.
+
+| Boundary | Excludes | MUST report |
+|---|---|---|
+| `repo_prefix` | paths in the wrong coordinates | nothing — it is a bug, not a boundary (§11.0) |
+| `--scope` | changed files outside the prefix | `out_of_scope`, counted |
+| `--decay-scope` | uncertain assertions citing nothing inside it | `excluded`, named |
+
+This rule exists because the same failure has now been found twice from opposite
+directions: a diff path in the wrong coordinates landed in `unknown` as though
+nothing were known about the file, and an artifact moving out of a decay scope made
+its discharge obligation disappear rather than lapse. Both were invisible. Neither
+was a wrong answer the reader could see.
+
 ### 13.1 Declared versus measured
 
 `coverage_declared: complete | partial | stub` on a Flow is an authored claim and can
@@ -871,3 +893,4 @@ are enforced mechanically instead of by careful reading.
 | INV-022 | Locators use symbols, not line numbers | 6.1 |
 | INV-023 | A changed file in scope must be modelled | 13.0 |
 | INV-024 | Decay must be discharged in the change that touches it | 13.0.1 |
+| INV-025 | A boundary reports what it excluded; it never reports silence | 13.0.2 |

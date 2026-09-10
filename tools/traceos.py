@@ -330,6 +330,11 @@ def main() -> int:
                     else ""
                 )
             )
+            if decay["excluded"]:
+                print(
+                    f"  ({len(decay['excluded'])} uncertain outside the decay scope: "
+                    f"{', '.join(decay['excluded'])})"
+                )
             if decay["grew"]:
                 print("  GREW      the uncertain count is above the baseline")
             for item in decay["undischarged"]:
