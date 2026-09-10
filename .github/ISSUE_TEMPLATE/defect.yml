@@ -1,0 +1,32 @@
+name: Defect
+description: The engine, a check or the schema does the wrong thing
+labels: ["defect"]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: The command you ran and what came back. Paste the output.
+      render: shell
+    validations: { required: true }
+  - type: textarea
+    id: expected
+    attributes:
+      label: What should have happened, and which rule says so
+      description: >
+        Cite the invariant (INV-nnn) or the specification section if one applies.
+        If no rule covers it, say so — that is useful too.
+    validations: { required: true }
+  - type: textarea
+    id: model
+    attributes:
+      label: Smallest model that reproduces it
+      description: >
+        A flow file is usually enough. If it only reproduces against a repository,
+        say what the repository looks like.
+      render: yaml
+  - type: input
+    id: version
+    attributes:
+      label: Python version and commit
+      placeholder: "3.12.3, 523979b"
