@@ -9,7 +9,7 @@ Every concept sits in exactly one tier, and the tier decides who may write it.
 | Tier | Concepts | Written by | Lives in |
 |---|---|---|---|
 | **AUTHORED** | System, Domain, Flow, Node, Relationship, State, External, Event, Context dimension, Assertion (claim + `when` + evidence *references*), `coverage_declared`, `lifecycle` | a human or an agent | `model/**.md`, reviewable |
-| **RECORDED** | Change, Reconciliation, Evidence Observation, identity ledger entry | appended when something happens | `changes/`, `observations/`, `identity/` |
+| **RECORDED** | Evidence Observation, identity ledger entry | appended when something happens | `observations/`, `identity/` |
 | **DERIVED** | Effective Reality, Impact, Integrity, Confidence, measured Coverage, Artifact table, contradiction report | computed from the two tiers above | query output; nowhere on disk |
 
 A DERIVED value found in an AUTHORED file is a validator error, not a style problem.
@@ -37,8 +37,7 @@ The tier is append-only, and it stays empty unless a skill is told to write it.
 | Artifact | Written by | When |
 |---|---|---|
 | Evidence Observation | `understanding-system`, `reconciling-reality` | every time a reference is actually checked |
-| Change record | opened by `tracing-change`, closed by `reconciling-reality` | before and after implementation |
-| Identity ledger entry | `reconciling-reality` | on a split, merge or replacement |
+| Identity ledger entry | `traceos identity`, during `reconciling-reality` | on a split, merge or replacement |
 
 Never edit an entry. Never delete one.
 

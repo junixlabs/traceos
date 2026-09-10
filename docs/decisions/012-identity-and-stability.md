@@ -62,7 +62,7 @@ time**. Putting it in the graph (ADR-006) would walk impact traversal into dead 
 - It is **entity metadata**, excluded from **every** traversal.
 - Used only for history queries.
 - Superseded ids live in an **identity ledger** (RECORDED, append-only, alongside
-  `changes/` and `observations/` — ADR-010), **not** as ghost nodes in flow files;
+  `observations/` — ADR-010), **not** as ghost nodes in flow files;
   otherwise `supersedes` would dangle.
 
 ## Consequences

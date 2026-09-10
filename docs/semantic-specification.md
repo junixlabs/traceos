@@ -43,7 +43,7 @@ Every concept in TraceOS belongs to exactly one tier.
 | Tier | Concepts | Author | Storage |
 |---|---|---|---|
 | **AUTHORED** | System, Domain, Flow, Node, Relationship, State, External, Event, Context dimension, Assertion, `lifecycle`, `coverage_declared`, `confidence_asserted` | human or agent | `model/**.md`, reviewable |
-| **RECORDED** | Change, Reconciliation, Evidence Observation, Identity ledger entry | appended when something happens | `changes/`, `observations/`, `identity/` — append-only |
+| **RECORDED** | Evidence Observation, Identity ledger entry | appended when something happens | `observations/`, `identity/` — append-only |
 | **DERIVED** | Effective Reality, Impact, Integrity, Confidence, measured Coverage, Artifact table, contradiction report | computed on demand | never stored |
 
 A DERIVED value appearing in an AUTHORED file MUST be a validation error, not a
@@ -63,13 +63,17 @@ Confidence (§6.3).
 
 ### 2.1 Who writes the RECORDED tier
 
-| Artifact | Written by | When |
-|---|---|---|
-| Evidence Observation | `understanding-system`, `reconciling-reality` | every time a reference is actually checked |
-| Change record | `tracing-change` opens, `reconciling-reality` closes | before and after implementation |
-| Identity ledger entry | `reconciling-reality` | on split / merge / replace |
+| Artifact | Written by | Read back by | When |
+|---|---|---|---|
+| Evidence Observation | `traceos observe` | `computed_confidence`, `coverage` | every time a reference is actually checked |
+| Identity ledger entry | `traceos identity` | `Model.superseded_by`, `validate` | on split / merge / replace |
 
 Append-only. Entries MUST NOT be edited or deleted.
+
+**The "read back by" column is a requirement, not a description.** A RECORDED
+artifact nothing reads is a status claim with no owner: it is specified, it looks
+maintained, and no result would change if every entry in it were wrong. If nothing
+would fail without it, it does not belong in this tier.
 
 ---
 
@@ -536,15 +540,24 @@ hangs, and reports MUST state it rather than leaving it implicit.
 
 ## 10. Change
 
-A Change is a RECORDED entry. Its categories are not mutually exclusive:
+A Change is the **input to a trace**, not a stored artifact. It arrives as a set of
+changed locators; the model answers what it might affect.
+
+Its categories are not mutually exclusive:
 
 `implementation` · `behavior` · `flow` · `structural` · `external` · `configuration`
 
 A Change is not necessarily a code change: an External changing its behavior is a
-Change with no local diff.
+Change with no local diff, which is why the input is locators rather than a git ref.
 
 Rollback is a Change producing a new Effective Reality. There MUST NOT be a Rollback
 entity.
+
+### 10.1 Why there is no change log
+
+v0.1 deliberately stores no `changes/`. What a change did is already recorded twice —
+in version control, and in the observations appended while reconciling it. A third
+copy would be the one nothing reads and nothing keeps true (§2.1).
 
 ---
 
@@ -745,9 +758,8 @@ model/
     ├── payment.md
     └── notification.md
 
-observations/*.jsonl     RECORDED, machine-written, append-only
-changes/*.jsonl          RECORDED
-identity/ledger.jsonl    RECORDED
+observations/*.jsonl     RECORDED, written by `traceos observe`, append-only
+identity/ledger.jsonl    RECORDED, written by `traceos identity`, append-only
 ```
 
 The agent's incremental unit of reasoning is one Flow, so one Flow is one file. Nodes

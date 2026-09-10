@@ -79,8 +79,9 @@ node.payment.process
 ## Locators have to survive refactoring
 
 Use symbol paths, never line numbers (INV-022). Renaming an artifact means fixing
-each reference that points at it, plus a Change record noting the re-anchor — **no
-entity changes its id** (see `identity.md`).
+each reference that points at it and re-observing them, because a re-anchored
+reference has not been checked at its new address — **no entity changes its id**
+(see `identity.md`).
 
 ## When a locator matches nothing
 

@@ -102,6 +102,7 @@ class Model:
         self.relationships: list[dict] = []
         self.assertions: dict[str, dict] = {}
         self.observations: list[dict] = []
+        self.ledger: list[dict] = []
         self.parse_errors: list[Finding] = []
         self._load()
 
@@ -131,6 +132,23 @@ class Model:
                     line = line.strip()
                     if line:
                         self.observations.append(json.loads(line))
+        ledger_path = self.root / "identity" / "ledger.jsonl"
+        if ledger_path.is_file():
+            for line in ledger_path.read_text(encoding="utf-8").splitlines():
+                line = line.strip()
+                if line:
+                    self.ledger.append(json.loads(line))
+
+    def superseded_by(self, old_id: str) -> list[str]:
+        """INV-014. What an id became, answered from the ledger rather than by
+        traversing the graph - a superseded id is deliberately not in the graph."""
+        return [
+            new
+            for entry in self.ledger
+            if entry.get("supersedes") == old_id
+            for new in [entry.get("id")]
+            if new
+        ]
 
     def _index(self, path: pathlib.Path, doc: dict) -> None:
         where = str(path.relative_to(self.root))
@@ -511,6 +529,17 @@ def validate_identity(model: Model) -> list[Finding]:
             )
         seen[node_id] = node["_where"]
         for old in node.get("supersedes") or []:
+            if node_id not in model.superseded_by(old):
+                findings.append(
+                    Finding(
+                        "error",
+                        "SUPERSEDES_NO_LEDGER_ENTRY",
+                        f"{node_id} supersedes {old}, which has no identity ledger "
+                        f"entry. A superseded id lives nowhere else, so nothing can "
+                        f"answer what {old} became (INV-014)",
+                        node["_where"],
+                    )
+                )
             if old in model.nodes:
                 findings.append(
                     Finding(
@@ -1133,6 +1162,40 @@ def observe(
     return entry, warnings
 
 
+def record_identity(
+    model_dir: pathlib.Path,
+    new_id: str,
+    old_id: str,
+    reason: str,
+    at_time: dt.datetime,
+) -> dict:
+    """INV-014, ADR-012. A superseded id has no home in the graph, so the ledger is
+    the only thing that can answer what it became. Refuses an entry naming an old id
+    the model still declares - that is a rename pretending to be a supersession."""
+    model = Model(model_dir)
+    if new_id not in model.nodes and new_id not in model.flows:
+        raise SystemExit(f"unknown entity: {new_id}")
+    if old_id in model.nodes or old_id in model.flows:
+        raise SystemExit(
+            f"{old_id} is still declared in the model. A superseded id must be "
+            f"removed from the graph first (INV-014)."
+        )
+    if new_id in model.superseded_by(old_id):
+        raise SystemExit(f"{new_id} already supersedes {old_id} in the ledger")
+
+    entry = {
+        "id": new_id,
+        "supersedes": old_id,
+        "reason": reason,
+        "recorded_at": at_time.isoformat().replace("+00:00", "Z"),
+    }
+    out_dir = model_dir / "identity"
+    out_dir.mkdir(exist_ok=True)
+    with (out_dir / "ledger.jsonl").open("a", encoding="utf-8") as fh:
+        fh.write(json.dumps(entry) + "\n")
+    return entry
+
+
 # ------------------------------------------------------------------- init
 
 IMPORT_PATTERNS = [
@@ -1182,6 +1245,7 @@ def init(repo: pathlib.Path, out: pathlib.Path, name: str) -> list[str]:
     slug = re.sub(r"[^a-z0-9-]", "-", name.lower()).strip("-") or "system"
     (out / "model" / "flows").mkdir(parents=True, exist_ok=True)
     (out / "observations").mkdir(exist_ok=True)
+    (out / "identity").mkdir(exist_ok=True)
 
     # The scaffold must be runnable on its own - the printed next steps invoke
     # tools/traceos.py from inside `out`.

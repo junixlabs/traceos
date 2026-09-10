@@ -3,6 +3,7 @@
 
     init     <repo> [--out DIR] [--name NAME]
     observe  <model_dir> --assertion ID --reference LOC --supports supports|refutes
+    identity <model_dir> --id NEW --supersedes OLD --reason TEXT
     validate <model_dir> [--repo-files FILE] [--repo PATH]
     resolve  <model_dir> [--context k=v ...] [--json]
     impact   <model_dir> --changed LOCATOR [--changed ...] [--depth N] [--json]
@@ -34,6 +35,7 @@ from engine import (
     integrity,
     observe,
     ratchet,
+    record_identity,
     resolve,
     validate,
 )
@@ -55,7 +57,9 @@ def read_repo_files(path: str | None) -> list[str] | None:
         return None
     target = pathlib.Path(path)
     if not target.is_file():
-        raise SystemExit(f"{path}: not a file. This flag takes a file listing paths, not a git ref.")
+        raise SystemExit(
+            f"{path}: not a file. This flag takes a file listing paths, not a git ref."
+        )
     lines = target.read_text().splitlines()
     return [line.strip() for line in lines if line.strip()]
 
@@ -81,6 +85,12 @@ def main() -> int:
     )
     p.add_argument("--kind", default=None)
     p.add_argument("--repo", default=None)
+
+    p = sub.add_parser("identity")
+    p.add_argument("model")
+    p.add_argument("--id", required=True, dest="new_id")
+    p.add_argument("--supersedes", required=True, dest="old_id")
+    p.add_argument("--reason", required=True)
 
     p = sub.add_parser("validate")
     p.add_argument("model")
@@ -194,6 +204,13 @@ def main() -> int:
         )
         for warning in warnings:
             print(f"WARN    {warning}", file=sys.stderr)
+        print(json.dumps(entry))
+        return 0
+
+    if args.cmd == "identity":
+        entry = record_identity(
+            pathlib.Path(args.model), args.new_id, args.old_id, args.reason, now
+        )
         print(json.dumps(entry))
         return 0
 

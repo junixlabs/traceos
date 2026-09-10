@@ -41,8 +41,7 @@ Append-only, and nothing lands there unless a skill is told to write it.
 | Artifact | Written by | When |
 |---|---|---|
 | Evidence Observation | `understanding-system`, `reconciling-reality` | every time a reference is actually checked |
-| Change record | opened by `tracing-change`, closed by `reconciling-reality` | before and after implementation |
-| Identity ledger entry | `reconciling-reality` | on a split, merge or replacement |
+| Identity ledger entry | `traceos identity`, during `reconciling-reality` | on a split, merge or replacement |
 
 ## The rules themselves
 
