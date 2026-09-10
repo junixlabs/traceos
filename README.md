@@ -120,7 +120,9 @@ schema/traceos.schema.json       frontmatter structure
 examples/ecommerce/              reference model touching every entity
 examples/traceos-itself/         TraceOS modelled in TraceOS
 skills/                          three agent skills over a shared reference/
-tools/traceos.py                 engine: init, observe, validate, resolve,
+tools/engine.py                  model, validation, resolution, impact, coverage
+tools/explore.py                 the HTML view
+tools/traceos.py                 command line: init, observe, validate, resolve,
                                  impact, diff, coverage, explore
 tests/run_tests.py               13 stress cases, 7 invariants, 4 tooling groups
 ```

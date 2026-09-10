@@ -18,7 +18,8 @@ import sys
 import tempfile
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent / "tools"))
-import traceos as T
+import engine as T
+import traceos as cli
 import yaml
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
@@ -1228,8 +1229,8 @@ def tool_explore():
     check(
         "TOOL explore",
         "an empty --context produces no phantom tab",
-        T.parse_context([""]) == {}
-        and T.parse_context(["", "tenant=a"]) == {"tenant": "a"},
+        cli.parse_context([""]) == {}
+        and cli.parse_context(["", "tenant=a"]) == {"tenant": "a"},
     )
     check(
         "TOOL explore",

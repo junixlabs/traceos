@@ -28,7 +28,7 @@ assertions:
     about: [node.understand.reference, node.understand.observe]
     evidence:
       - { kind: documentation, locator: "skills/understanding-system/SKILL.md#Record Evidence references, then observe" }
-      - { kind: implementation, locator: "tools/traceos.py#observe" }
+      - { kind: implementation, locator: "tools/engine.py#observe" }
       - { kind: test, locator: "tests/run_tests.py#tool_observe" }
   - id: assert.understand.coverage-needs-repo
     claim: "unmodeled areas are only detectable with the repository file list as input"
@@ -36,7 +36,7 @@ assertions:
     lifecycle: current
     about: [flow.understand]
     evidence:
-      - { kind: implementation, locator: "tools/traceos.py#coverage" }
+      - { kind: implementation, locator: "tools/engine.py#coverage" }
       - { kind: documentation, locator: "skills/reference/coverage-and-impact.md#INV-010 COVERAGE-NEEDS-REPO" }
 ---
 
