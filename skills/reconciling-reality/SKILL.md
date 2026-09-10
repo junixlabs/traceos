@@ -90,8 +90,17 @@ Not every implementation change requires model modification.
 ### 6. Reconcile identity
 
 Preserve the ID when behavior is the same (INV-013). When an entity is genuinely
-replaced, mint a new ID, write `supersedes`, and **append to the identity ledger**
-(RECORDED tier). Do not mint IDs because implementation structure moved.
+replaced, mint a new ID, write `supersedes`, remove the old id from the graph, and
+record the ledger entry:
+
+```bash
+traceos identity <model> --id node.new --supersedes node.old --reason "split"
+```
+
+A `supersedes` with no ledger entry fails validation. The ledger is the only place a
+superseded id lives, so without the entry nothing can answer what `node.old` became.
+
+Do not mint IDs because implementation structure moved (INV-013).
 
 ### 7. Reconcile Outcomes
 
@@ -99,11 +108,7 @@ Outcomes are explicit declarations bound to States (INV-015). If the new reality
 produces an outcome the Flow does not declare, update the declaration and the graph.
 Do not infer an Outcome from a terminal Node.
 
-### 8. Close the Change record
-
-Append the reconciliation result to the Change opened by `tracing-change`.
-
-### 9. Validate and recompute
+### 8. Validate and recompute
 
 Run the validator: identity, matrix conformance, references, assertion consistency,
 lifecycle, `UNDECLARED_TERMINAL_NODE`, `UNREACHABLE_OUTCOME`,
@@ -115,7 +120,7 @@ percentage (INV-012).
 **Do not mark the model complete merely because known discrepancies were reconciled.**
 Closing the gaps you found says nothing about the gaps you did not look for.
 
-### 10. Report Integrity
+### 9. Report Integrity
 
 Integrity is **computed, not decided** (INV-001) — run the validator and report what
 it returns: `valid` · `invalid` · `uncertain`.
@@ -145,10 +150,9 @@ observation first.
 6. Semantic differences found
 7. Reconciliation performed (and what was deliberately left alone)
 8. Identity changes + ledger entries
-9. Change record closed
-10. Validation findings
-11. Coverage — counts and named gaps
-12. **Integrity** as computed
+9. Validation findings
+10. Coverage — counts and named gaps
+11. **Integrity** as computed
 
 The result MUST distinguish **established** reality from **uncertain** reality from
 **unknown / unmodeled** behavior.

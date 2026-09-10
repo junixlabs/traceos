@@ -43,12 +43,15 @@ contract change · database/schema change · existing TraceOS model.
 
 ## Workflow
 
-### 1. Open a Change record
+### 1. Classify the change
 
-Append to the RECORDED tier before tracing (see [`tiers`](../reference/tiers.md)).
-Classify — categories are **not** mutually exclusive:
+The change is the input, not something you store — version control already holds it
+(spec §10.1). State its categories, which are **not** mutually exclusive:
 
 `implementation` · `behavior` · `flow` · `structural` · `external` · `configuration`
+
+An External changing behavior is a change with no local diff. Say so, because
+nothing in the diff will.
 
 ### 2. Resolve artifacts to semantic entities
 
@@ -127,7 +130,7 @@ Reality (INV-016).
 
 ## Output
 
-1. Change summary + Change record id
+1. Change summary and categories
 2. Changed artifacts
 3. Semantic entities resolved (and identity decisions taken)
 4. Affected Flows

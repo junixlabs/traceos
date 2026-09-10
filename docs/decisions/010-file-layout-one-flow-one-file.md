@@ -29,7 +29,6 @@ model/
     └── notification.md
 
 observations/*.jsonl       RECORDED, machine-written, append-only
-changes/*.jsonl            RECORDED
 identity/ledger.jsonl      RECORDED
 ```
 

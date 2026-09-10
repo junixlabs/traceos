@@ -60,6 +60,15 @@ time. Put it in the graph and impact traversal will walk straight into dead node
 - Superseded ids live in the **identity ledger** (RECORDED, append-only) — never as
   ghost nodes left behind in a flow file, or `supersedes` would point at nothing.
 
+```bash
+traceos identity <model> --id node.new --supersedes node.old --reason "split"
+```
+
+`validate` fails on a `supersedes` with no ledger entry, and `identity` refuses an
+old id the model still declares. Between them, the ledger is the only home for a
+superseded id and it is never empty when one exists — `Model.superseded_by(old)`
+answers what it became.
+
 ## A limit worth being honest about
 
 **The validator cannot check an identity decision.** It verifies that ids are used

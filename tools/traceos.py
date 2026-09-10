@@ -3,6 +3,7 @@
 
     init     <repo> [--out DIR] [--name NAME]
     observe  <model_dir> --assertion ID --reference LOC --supports supports|refutes
+    identity <model_dir> --id NEW --supersedes OLD --reason TEXT
     validate <model_dir> [--repo-files FILE] [--repo PATH]
     resolve  <model_dir> [--context k=v ...] [--json]
     impact   <model_dir> --changed LOCATOR [--changed ...] [--depth N] [--json]
@@ -33,6 +34,8 @@ from engine import (
     init,
     integrity,
     observe,
+    ratchet,
+    record_identity,
     resolve,
     validate,
 )
@@ -52,7 +55,12 @@ def parse_context(pairs: list[str]) -> dict:
 def read_repo_files(path: str | None) -> list[str] | None:
     if not path:
         return None
-    lines = pathlib.Path(path).read_text().splitlines()
+    target = pathlib.Path(path)
+    if not target.is_file():
+        raise SystemExit(
+            f"{path}: not a file. This flag takes a file listing paths, not a git ref."
+        )
+    lines = target.read_text().splitlines()
     return [line.strip() for line in lines if line.strip()]
 
 
@@ -77,6 +85,12 @@ def main() -> int:
     )
     p.add_argument("--kind", default=None)
     p.add_argument("--repo", default=None)
+
+    p = sub.add_parser("identity")
+    p.add_argument("model")
+    p.add_argument("--id", required=True, dest="new_id")
+    p.add_argument("--supersedes", required=True, dest="old_id")
+    p.add_argument("--reason", required=True)
 
     p = sub.add_parser("validate")
     p.add_argument("model")
@@ -109,6 +123,18 @@ def main() -> int:
     p = sub.add_parser("coverage")
     p.add_argument("model")
     p.add_argument("--repo-files", required=True)
+    p.add_argument("--json", action="store_true")
+
+    p = sub.add_parser("ratchet")
+    p.add_argument("model")
+    p.add_argument("--changed", action="append", default=[])
+    p.add_argument("--changed-from", help="file listing changed paths, one per line")
+    p.add_argument(
+        "--scope",
+        action="append",
+        default=[],
+        help="only gate changed files under this prefix; repeatable, and it grows",
+    )
     p.add_argument("--json", action="store_true")
 
     p = sub.add_parser("explore")
@@ -181,6 +207,13 @@ def main() -> int:
         print(json.dumps(entry))
         return 0
 
+    if args.cmd == "identity":
+        entry = record_identity(
+            pathlib.Path(args.model), args.new_id, args.old_id, args.reason, now
+        )
+        print(json.dumps(entry))
+        return 0
+
     if args.cmd == "diff":
         result = graph_diff(
             Model(pathlib.Path(args.model_a)), Model(pathlib.Path(args.model_b))
@@ -249,6 +282,25 @@ def main() -> int:
                 for item in result[tier]:
                     print(f"  {item}")
         return 0
+
+    if args.cmd == "ratchet":
+        changed = list(args.changed)
+        if args.changed_from:
+            changed += read_repo_files(args.changed_from) or []
+        result = ratchet(model, changed, args.scope or None)
+        if args.json:
+            print(json.dumps(result, indent=2))
+        else:
+            print(f"scope: {', '.join(result['scope'])}")
+            print(
+                f"{len(result['mapped'])} of {len(result['in_scope'])} changed files "
+                f"in scope map to a node"
+            )
+            for path in result["unmapped"]:
+                print(f"  UNMAPPED  {path}")
+            if result["out_of_scope"]:
+                print(f"({len(result['out_of_scope'])} changed files outside the scope)")
+        return 1 if result["unmapped"] else 0
 
     if args.cmd == "coverage":
         cov = coverage(model, read_repo_files(args.repo_files), now)

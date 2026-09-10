@@ -171,7 +171,11 @@
           "id": true, "type": true,
           "name": { "type": "string" },
           "domains": { "type": "array", "items": { "type": "string" } },
-          "staleness_window_days": { "type": "integer", "minimum": 1, "default": 90 }
+          "staleness_window_days": { "type": "integer", "minimum": 1, "default": 90 },
+          "repo_prefix": {
+            "type": "string",
+            "description": "Where this model's locators sit relative to the repository root, e.g. \"packages/api\" in a monorepo. Without it every path a diff produces misses, and a miss is invisible."
+          }
         }
       }
     },

@@ -1101,6 +1101,79 @@ def tool_observe():
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+def tool_identity_ledger():
+    """ADR-012 / issue #4: a superseded id lives nowhere in the graph, so the ledger
+    is the only thing that can answer what it became."""
+    tmp = pathlib.Path(tempfile.mkdtemp(prefix="traceos-idl-"))
+    try:
+        git_repo(tmp)
+        out = tmp / "traceos"
+        T.init(tmp, out, "Demo")
+        flow = out / "model" / "flows" / "example.md"
+
+        flow.write_text(
+            flow.read_text().replace(
+                "  - { id: node.example.step, type: action, name: Rename me }",
+                "  - { id: node.example.step, type: action, name: Rename me,\n"
+                "      supersedes: [node.example.old] }",
+            )
+        )
+        codes = [f.code for f in T.validate(T.Model(out), None, {}, NOW)]
+        check(
+            "TOOL identity",
+            "supersedes with no ledger entry is an error, not a silent dangling id",
+            "SUPERSEDES_NO_LEDGER_ENTRY" in codes,
+        )
+
+        try:
+            T.record_identity(out, "node.example.step", "node.example.step", "x", NOW)
+            refused = False
+        except SystemExit:
+            refused = True
+        check(
+            "TOOL identity",
+            "refuses to supersede an id the model still declares",
+            refused,
+        )
+
+        try:
+            T.record_identity(out, "node.nope", "node.example.old", "x", NOW)
+            refused = False
+        except SystemExit:
+            refused = True
+        check("TOOL identity", "refuses a new id the model does not have", refused)
+
+        T.record_identity(out, "node.example.step", "node.example.old", "split", NOW)
+        model = T.Model(out)
+        check(
+            "TOOL identity",
+            "the ledger answers what a superseded id became",
+            model.superseded_by("node.example.old") == ["node.example.step"],
+        )
+        codes = [f.code for f in T.validate(model, None, {}, NOW)]
+        check(
+            "TOOL identity",
+            "with the entry recorded, the supersedes validates",
+            "SUPERSEDES_NO_LEDGER_ENTRY" not in codes,
+        )
+
+        try:
+            T.record_identity(out, "node.example.step", "node.example.old", "split", NOW)
+            refused = False
+        except SystemExit:
+            refused = True
+        check("TOOL identity", "refuses to record the same supersession twice", refused)
+
+        rel = T.Model(out).relationships
+        check(
+            "TOOL identity",
+            "a ledger entry never becomes a relationship (INV-014)",
+            all(r.get("type") != "supersedes" for r in rel),
+        )
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 def tool_artifact_changed():
     """spec 6.3: confidence must fall with nobody editing a model file."""
     tmp = pathlib.Path(tempfile.mkdtemp(prefix="traceos-chg-"))
@@ -1383,11 +1456,87 @@ def tool_content_not_history():
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+def tool_ratchet():
+    """Disclosure is not discharge: a changed file in scope must be modelled."""
+    model = T.Model(EXAMPLE)
+
+    mapped = T.ratchet(model, ["src/payment/PaymentProcessor.ts"], ["src/"])
+    check(
+        "TOOL ratchet",
+        "a changed file that maps to a node passes",
+        mapped["unmapped"] == [] and mapped["mapped"],
+        str(mapped),
+    )
+
+    gap = T.ratchet(model, ["src/refund/RefundService.ts"], ["src/"])
+    check(
+        "TOOL ratchet",
+        "a changed file that maps to nothing is rejected, not merely disclosed",
+        gap["unmapped"] == ["src/refund/RefundService.ts"],
+        str(gap),
+    )
+
+    scoped = T.ratchet(model, ["src/refund/RefundService.ts"], ["src/payment/"])
+    check(
+        "TOOL ratchet",
+        "scope is what makes it adoptable — outside it, nothing is gated",
+        scoped["unmapped"] == [] and scoped["out_of_scope"],
+        str(scoped),
+    )
+    check(
+        "TOOL ratchet",
+        "with no scope, every changed file is gated",
+        T.ratchet(model, ["src/refund/RefundService.ts"], None)["unmapped"] != [],
+    )
+
+
+def tool_monorepo_prefix():
+    """spec 11: a locator and a diff path have to be in the same coordinates."""
+    check(
+        "TOOL monorepo prefix",
+        "without a prefix, a monorepo diff path misses and the miss is invisible",
+        not T._locator_matches(
+            "src/payment/Processor.ts#charge", "packages/api/src/payment/Processor.ts"
+        ),
+    )
+    check(
+        "TOOL monorepo prefix",
+        "with the package declared, the same path matches",
+        T._locator_matches(
+            "src/payment/Processor.ts#charge",
+            "packages/api/src/payment/Processor.ts",
+            "packages/api",
+        ),
+    )
+    check(
+        "TOOL monorepo prefix",
+        "a directory in the changed set covers the locators beneath it",
+        T._locator_matches("src/payment/Processor.ts#charge", "src/payment"),
+    )
+    check(
+        "TOOL monorepo prefix",
+        "a leading ./ is not a different file",
+        T._locator_matches(
+            "src/payment/Processor.ts#charge", "./src/payment/Processor.ts"
+        ),
+    )
+    check(
+        "TOOL monorepo prefix",
+        "a different file is still a different file",
+        not T._locator_matches(
+            "src/payment/Processor.ts#charge", "src/payment/Processor.tsx"
+        ),
+    )
+
+
 TOOLING = [
     tool_init,
     tool_observe,
+    tool_identity_ledger,
     tool_artifact_changed,
     tool_content_not_history,
+    tool_ratchet,
+    tool_monorepo_prefix,
     tool_explore,
 ]
 

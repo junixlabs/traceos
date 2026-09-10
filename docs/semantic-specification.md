@@ -43,7 +43,7 @@ Every concept in TraceOS belongs to exactly one tier.
 | Tier | Concepts | Author | Storage |
 |---|---|---|---|
 | **AUTHORED** | System, Domain, Flow, Node, Relationship, State, External, Event, Context dimension, Assertion, `lifecycle`, `coverage_declared`, `confidence_asserted` | human or agent | `model/**.md`, reviewable |
-| **RECORDED** | Change, Reconciliation, Evidence Observation, Identity ledger entry | appended when something happens | `changes/`, `observations/`, `identity/` — append-only |
+| **RECORDED** | Evidence Observation, Identity ledger entry | appended when something happens | `observations/`, `identity/` — append-only |
 | **DERIVED** | Effective Reality, Impact, Integrity, Confidence, measured Coverage, Artifact table, contradiction report | computed on demand | never stored |
 
 A DERIVED value appearing in an AUTHORED file MUST be a validation error, not a
@@ -63,13 +63,17 @@ Confidence (§6.3).
 
 ### 2.1 Who writes the RECORDED tier
 
-| Artifact | Written by | When |
-|---|---|---|
-| Evidence Observation | `understanding-system`, `reconciling-reality` | every time a reference is actually checked |
-| Change record | `tracing-change` opens, `reconciling-reality` closes | before and after implementation |
-| Identity ledger entry | `reconciling-reality` | on split / merge / replace |
+| Artifact | Written by | Read back by | When |
+|---|---|---|---|
+| Evidence Observation | `traceos observe` | `computed_confidence`, `coverage` | every time a reference is actually checked |
+| Identity ledger entry | `traceos identity` | `Model.superseded_by`, `validate` | on split / merge / replace |
 
 Append-only. Entries MUST NOT be edited or deleted.
+
+**The "read back by" column is a requirement, not a description.** A RECORDED
+artifact nothing reads is a status claim with no owner: it is specified, it looks
+maintained, and no result would change if every entry in it were wrong. If nothing
+would fail without it, it does not belong in this tier.
 
 ---
 
@@ -536,19 +540,37 @@ hangs, and reports MUST state it rather than leaving it implicit.
 
 ## 10. Change
 
-A Change is a RECORDED entry. Its categories are not mutually exclusive:
+A Change is the **input to a trace**, not a stored artifact. It arrives as a set of
+changed locators; the model answers what it might affect.
+
+Its categories are not mutually exclusive:
 
 `implementation` · `behavior` · `flow` · `structural` · `external` · `configuration`
 
 A Change is not necessarily a code change: an External changing its behavior is a
-Change with no local diff.
+Change with no local diff, which is why the input is locators rather than a git ref.
 
 Rollback is a Change producing a new Effective Reality. There MUST NOT be a Rollback
 entity.
 
+### 10.1 Why there is no change log
+
+v0.1 deliberately stores no `changes/`. What a change did is already recorded twice —
+in version control, and in the observations appended while reconciling it. A third
+copy would be the one nothing reads and nothing keeps true (§2.1).
+
 ---
 
 ## 11. Artifacts and the reverse index
+
+### 11.0 One coordinate system
+
+A locator and a path from a diff MUST be compared in repository-root coordinates. A
+model living under a package in a monorepo declares `repo_prefix` on its System.
+
+Without it every path a diff produces misses — and a miss is **invisible**, because
+it lands in `unknown` exactly as though nothing were known about the file. A
+directory in the changed set covers every locator beneath it.
 
 ### 11.1 Artifact is DERIVED
 
@@ -635,6 +657,27 @@ carry all four tiers, including an empty `unknown`.
 **Absence is not in the model**, so UNMODELED can never be found by reading the
 model. A coverage query MUST take the repository file list as input.
 
+### 13.0 INV-023 RATCHET-ON-CHANGE
+
+Coverage and the `unknown` impact tier **disclose** that something is unmodelled.
+Neither makes it less unmodelled next month.
+
+A changed file inside a declared scope that maps to no Node MUST fail. Disclosure is
+not discharge: a warning that nothing acts on is a status header, and readers learn
+to skip it.
+
+```
+ratchet(model, changed_files, scope) -> fails on any file in scope mapping to no Node
+```
+
+`scope` is what makes this adoptable, and it is the thing that tightens: the gate
+covers changed files under a declared prefix, and the prefix grows. A gate nobody can
+pass gets bypassed, and a bypassed gate teaches everyone to bypass the next one.
+
+Measured elsewhere, in a repository running a comparable layer: a freeze of 12,454
+annotations across 965 files held for as long as nothing asked *"you are already
+editing this file, so why is it still unaccounted for"*.
+
 ### 13.1 Declared versus measured
 
 `coverage_declared: complete | partial | stub` on a Flow is an authored claim and can
@@ -715,9 +758,8 @@ model/
     ├── payment.md
     └── notification.md
 
-observations/*.jsonl     RECORDED, machine-written, append-only
-changes/*.jsonl          RECORDED
-identity/ledger.jsonl    RECORDED
+observations/*.jsonl     RECORDED, written by `traceos observe`, append-only
+identity/ledger.jsonl    RECORDED, written by `traceos identity`, append-only
 ```
 
 The agent's incremental unit of reasoning is one Flow, so one Flow is one file. Nodes
@@ -797,3 +839,4 @@ are enforced mechanically instead of by careful reading.
 | INV-020 | Every verification appends an observation | 6.1 |
 | INV-021 | Concurrency is the absence of `next` | 5.5 |
 | INV-022 | Locators use symbols, not line numbers | 6.1 |
+| INV-023 | A changed file in scope must be modelled | 13.0 |

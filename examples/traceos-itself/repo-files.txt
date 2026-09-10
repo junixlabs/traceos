@@ -1,4 +1,6 @@
 CHANGELOG.md
+CODE_OF_CONDUCT.md
+CONTRIBUTING.md
 docs/decisions/001-three-tier-entities.md
 docs/decisions/002-evidence-reference-vs-observation.md
 docs/decisions/003-confidence-is-derived.md
@@ -26,8 +28,17 @@ examples/ecommerce/model/flows/purchase.md
 examples/ecommerce/model/flows/retry-payment.md
 examples/ecommerce/model/system.md
 examples/ecommerce/README.md
+.github/dependabot.yml
+.github/ISSUE_TEMPLATE/config.yml
+.github/ISSUE_TEMPLATE/defect.yml
+.github/ISSUE_TEMPLATE/unrepresentable.yml
+.github/PULL_REQUEST_TEMPLATE.md
+.github/workflows/ci.yml
+.github/workflows/codeql.yml
+.github/workflows/pages.yml
 README.md
 schema/traceos.schema.json
+SECURITY.md
 skills/README.md
 skills/reconciling-reality/SKILL.md
 skills/reference/context.md
@@ -43,5 +54,9 @@ skills/reference/vocabulary.md
 skills/tracing-change/SKILL.md
 skills/understanding-system/SKILL.md
 tests/run_tests.py
+tools/check_docs.py
+tools/check_locators.py
+tools/engine.py
 tools/explore.py
+tools/site.py
 tools/traceos.py

@@ -102,6 +102,7 @@ class Model:
         self.relationships: list[dict] = []
         self.assertions: dict[str, dict] = {}
         self.observations: list[dict] = []
+        self.ledger: list[dict] = []
         self.parse_errors: list[Finding] = []
         self._load()
 
@@ -131,6 +132,23 @@ class Model:
                     line = line.strip()
                     if line:
                         self.observations.append(json.loads(line))
+        ledger_path = self.root / "identity" / "ledger.jsonl"
+        if ledger_path.is_file():
+            for line in ledger_path.read_text(encoding="utf-8").splitlines():
+                line = line.strip()
+                if line:
+                    self.ledger.append(json.loads(line))
+
+    def superseded_by(self, old_id: str) -> list[str]:
+        """INV-014. What an id became, answered from the ledger rather than by
+        traversing the graph - a superseded id is deliberately not in the graph."""
+        return [
+            new
+            for entry in self.ledger
+            if entry.get("supersedes") == old_id
+            for new in [entry.get("id")]
+            if new
+        ]
 
     def _index(self, path: pathlib.Path, doc: dict) -> None:
         where = str(path.relative_to(self.root))
@@ -183,6 +201,10 @@ class Model:
         # any well-formed state id resolves.
         return kind == "state"
 
+    def repo_prefix(self) -> str:
+        """Where the model's locators sit relative to the repository root."""
+        return str(self.system.get("repo_prefix", "") or "")
+
     def artifact_table(self) -> dict[str, list[str]]:
         """INV-011.1 reverse index: locator -> [assertion ids] (DERIVED)."""
         table: dict[str, list[str]] = {}
@@ -196,7 +218,7 @@ class Model:
         hits: set[str] = set()
         for assertion in self.assertions.values():
             for ev in assertion.get("evidence") or []:
-                if _locator_matches(ev["locator"], locator):
+                if _locator_matches(ev["locator"], locator, self.repo_prefix()):
                     hits |= {
                         a for a in assertion.get("about") or [] if kind_of(a) == "node"
                     }
@@ -206,7 +228,7 @@ class Model:
         flows: set[str] = set()
         for assertion in self.assertions.values():
             for ev in assertion.get("evidence") or []:
-                if not _locator_matches(ev["locator"], locator):
+                if not _locator_matches(ev["locator"], locator, self.repo_prefix()):
                     continue
                 flows |= {a for a in assertion.get("about") or [] if kind_of(a) == "flow"}
                 if assertion.get("_flow"):
@@ -215,18 +237,37 @@ class Model:
 
 
 def _norm_path(path: str) -> str:
-    return path[2:] if path.startswith("./") else path
+    path = path[2:] if path.startswith("./") else path
+    return path.rstrip("/") if path.endswith("/") and path != "/" else path
 
 
-def _locator_matches(declared: str, changed: str) -> bool:
+def _locator_matches(declared: str, changed: str, prefix: str = "") -> bool:
+    """Compare a declared locator with a path from a diff.
+
+    Both sides are brought to repository-root coordinates first. A model that
+    lives under a package in a monorepo declares that package as its prefix;
+    without it, every path a diff produces misses, and a miss is invisible -
+    it lands in `unknown` as though nothing were known about the file.
+    """
     dfile = _norm_path(declared.split("#", 1)[0])
     cfile = _norm_path(changed.split("#", 1)[0])
-    if dfile.endswith("/**"):
+    if prefix:
+        prefix = _norm_path(prefix).strip("/")
+        dfile = f"{prefix}/{dfile}"
+        if cfile == prefix:
+            cfile = ""  # the whole package changed
+    is_glob = dfile.endswith("/**")
+
+    if is_glob:
         if not cfile.startswith(dfile[:-2]):
             return False
+    elif cfile == "" or (cfile.count(".") == 0 and dfile.startswith(cfile + "/")):
+        # a directory in the changed set covers every locator beneath it
+        return True
     elif dfile != cfile:
         return False
-    if "#" in changed and "#" in declared and not dfile.endswith("/**"):
+
+    if "#" in changed and "#" in declared and not is_glob:
         return declared.split("#", 1)[1] == changed.split("#", 1)[1]
     return True
 
@@ -488,6 +529,17 @@ def validate_identity(model: Model) -> list[Finding]:
             )
         seen[node_id] = node["_where"]
         for old in node.get("supersedes") or []:
+            if node_id not in model.superseded_by(old):
+                findings.append(
+                    Finding(
+                        "error",
+                        "SUPERSEDES_NO_LEDGER_ENTRY",
+                        f"{node_id} supersedes {old}, which has no identity ledger "
+                        f"entry. A superseded id lives nowhere else, so nothing can "
+                        f"answer what {old} became (INV-014)",
+                        node["_where"],
+                    )
+                )
             if old in model.nodes:
                 findings.append(
                     Finding(
@@ -800,7 +852,7 @@ def impact(model: Model, changed: list[str], depth: int = 2) -> dict:
     unknown: list[str] = []
 
     for locator in changed:
-        matched = [d for d in table if _locator_matches(d, locator)]
+        matched = [d for d in table if _locator_matches(d, locator, model.repo_prefix())]
         if not matched:
             unknown.append(locator)
             continue
@@ -932,6 +984,43 @@ def graph_diff(a: Model, b: Model) -> dict:
     return out
 
 
+def ratchet(model: Model, changed: list[str], scope: list[str] | None = None) -> dict:
+    """INV-023. A file you are editing must be modelled.
+
+    Coverage and the `unknown` impact tier disclose that something is unmodelled;
+    neither makes it less unmodelled next month. Measured elsewhere: a freeze of
+    12,454 comments across 965 files held for as long as nothing asked "you are
+    already editing this file, so why is it still unaccounted for". Disclosure is
+    not discharge.
+
+    `scope` is what makes this adoptable and what tightens over time: the gate
+    applies only to changed files under a declared prefix, and the prefix grows.
+    A gate nobody can pass gets bypassed, and a bypassed gate teaches everyone to
+    bypass the next one.
+    """
+    prefix = model.repo_prefix()
+    table = model.artifact_table()
+    in_scope, mapped, unmapped = [], [], []
+
+    for path in changed:
+        clean = _norm_path(path)
+        if scope and not any(clean.startswith(_norm_path(s).rstrip("/")) for s in scope):
+            continue
+        in_scope.append(clean)
+        if any(_locator_matches(declared, clean, prefix) for declared in table):
+            mapped.append(clean)
+        else:
+            unmapped.append(clean)
+
+    return {
+        "scope": scope or ["(everything changed)"],
+        "in_scope": sorted(in_scope),
+        "mapped": sorted(mapped),
+        "unmapped": sorted(unmapped),
+        "out_of_scope": sorted({_norm_path(c) for c in changed} - set(in_scope)),
+    }
+
+
 # ------------------------------------------------------------------ coverage
 
 
@@ -1026,7 +1115,14 @@ def observe(
         raise SystemExit(f"unknown assertion: {assertion_id}")
 
     declared = {ev["locator"]: ev for ev in assertion.get("evidence") or []}
-    match = next((loc for loc in declared if _locator_matches(loc, reference)), None)
+    match = next(
+        (
+            loc
+            for loc in declared
+            if _locator_matches(loc, reference, model.repo_prefix())
+        ),
+        None,
+    )
     if match is None:
         raise SystemExit(
             f"{assertion_id} declares no evidence reference matching '{reference}'.\n"
@@ -1064,6 +1160,40 @@ def observe(
     with (out_dir / f"{at_time:%Y-%m}.jsonl").open("a", encoding="utf-8") as fh:
         fh.write(json.dumps(entry) + "\n")
     return entry, warnings
+
+
+def record_identity(
+    model_dir: pathlib.Path,
+    new_id: str,
+    old_id: str,
+    reason: str,
+    at_time: dt.datetime,
+) -> dict:
+    """INV-014, ADR-012. A superseded id has no home in the graph, so the ledger is
+    the only thing that can answer what it became. Refuses an entry naming an old id
+    the model still declares - that is a rename pretending to be a supersession."""
+    model = Model(model_dir)
+    if new_id not in model.nodes and new_id not in model.flows:
+        raise SystemExit(f"unknown entity: {new_id}")
+    if old_id in model.nodes or old_id in model.flows:
+        raise SystemExit(
+            f"{old_id} is still declared in the model. A superseded id must be "
+            f"removed from the graph first (INV-014)."
+        )
+    if new_id in model.superseded_by(old_id):
+        raise SystemExit(f"{new_id} already supersedes {old_id} in the ledger")
+
+    entry = {
+        "id": new_id,
+        "supersedes": old_id,
+        "reason": reason,
+        "recorded_at": at_time.isoformat().replace("+00:00", "Z"),
+    }
+    out_dir = model_dir / "identity"
+    out_dir.mkdir(exist_ok=True)
+    with (out_dir / "ledger.jsonl").open("a", encoding="utf-8") as fh:
+        fh.write(json.dumps(entry) + "\n")
+    return entry
 
 
 # ------------------------------------------------------------------- init
@@ -1115,6 +1245,7 @@ def init(repo: pathlib.Path, out: pathlib.Path, name: str) -> list[str]:
     slug = re.sub(r"[^a-z0-9-]", "-", name.lower()).strip("-") or "system"
     (out / "model" / "flows").mkdir(parents=True, exist_ok=True)
     (out / "observations").mkdir(exist_ok=True)
+    (out / "identity").mkdir(exist_ok=True)
 
     # The scaffold must be runnable on its own - the printed next steps invoke
     # tools/traceos.py from inside `out`.
