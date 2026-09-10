@@ -102,6 +102,14 @@ reality, impact, coverage and integrity are computed by the engine and embedded 
 results — no traversal runs in the browser, so there is no second implementation to
 drift from the engine.</p>
 
+<p class="note"><strong>A page showing <code>uncertain</code> is not a broken
+page.</strong> Confidence is computed from when each reference was last checked and
+whether the artifact has changed since. Edit a file a model cites and its confidence
+falls here on the next push, with nobody touching the model — that is the mechanism,
+not a fault. <code>integrity: UNCERTAIN</code> likewise usually means there are
+repository files the model does not cover, which is the normal state of a model that
+is honest about its edges.</p>
+
 <footer>
 Built {now:%Y-%m-%d} · <a class="plain" href="{REPO}">source</a> ·
 <a class="plain" href="{REPO}/blob/main/docs/semantic-specification.md">specification</a> ·
