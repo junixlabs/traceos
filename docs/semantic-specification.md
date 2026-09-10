@@ -282,7 +282,25 @@ evidence:
 ```
 
 Locators MUST use symbol paths. Line numbers MUST NOT be used — refactoring destroys
-them, contradicting INV-013.
+them, contradicting INV-013. A numbered heading is a line number wearing a different
+hat: `#10. Report Integrity` goes stale the moment a section is inserted above it,
+and goes stale in silence. Anchor the text alone.
+
+**Use a single-segment anchor.** A compound anchor such as `#StripeAdapter.charge`
+is cheap to specify and expensive to verify: checking it properly means resolving
+the symbol, which means parsing the host language. Every checker that stops short
+verifies one segment and reports a green the reader will over-read.
+
+Measured across two independently designed layers — this one and an unrelated
+annotation graph — 41 locators with 36 anchored and 0 dotted, against 685 edges
+with 40 anchored and 0 dotted. Both specifications advertised the compound form.
+Neither checker verified it. Nobody in either project had ever written one.
+
+That is a property of the affordance rather than a coincidence, and the guidance
+that follows from it is to leave the compound form out of a third implementation.
+Where one already exists, report which segment was verified rather than narrowing
+the check (INV-025): a predicate returning a bool can only overstate or understate,
+while one returning *what it verified* can be honest at no cost.
 
 #### INV-020 OBSERVATION-REQUIRED
 
