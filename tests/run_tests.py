@@ -1580,6 +1580,23 @@ def tool_anchor_rot():
         "an exact heading resolves",
         check_locators.anchor_present("### Report Integrity", "Report Integrity"),
     )
+    check(
+        "TOOL anchor rot",
+        "INV-025: a tail match says which it was, it does not pass as a resolution",
+        check_locators.anchor_present("def charge(self):", "StripeAdapter.charge")
+        == "tail"
+        and check_locators.anchor_present("### Report Integrity", "Report Integrity")
+        == "exact",
+    )
+    check(
+        "TOOL anchor rot",
+        "a deleted method resolves off a mention, which is why the tool says 'tail'",
+        check_locators.anchor_present(
+            "class StripeAdapter:\n    # charge() was removed\n",
+            "StripeAdapter.charge",
+        )
+        == "tail",
+    )
 
 
 def tool_monorepo_prefix():
