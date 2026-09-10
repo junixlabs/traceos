@@ -20,9 +20,16 @@ import engine as T
 
 def anchor_present(text: str, anchor: str) -> bool:
     """Symbol, heading or test name. Loose on purpose: this catches rot, it does not
-    parse the host language."""
+    parse the host language.
+
+    The dotted-tail fallback is for `Class.method`, so it is refused for anything
+    containing a space. `#10. Report Integrity` once matched a heading renumbered to
+    `9.` through that fallback, which is the exact rot this file exists to catch.
+    """
     if anchor in text:
         return True
+    if " " in anchor:
+        return False
     tail = anchor.rsplit(".", 1)[-1]
     return bool(tail) and tail in text
 

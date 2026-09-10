@@ -678,6 +678,36 @@ Measured elsewhere, in a repository running a comparable layer: a freeze of 12,4
 annotations across 965 files held for as long as nothing asked *"you are already
 editing this file, so why is it still unaccounted for"*.
 
+### 13.0.1 INV-024 DECAY-DISCHARGE
+
+Confidence falling is a **disclosure**. Two rules turn it into an obligation:
+
+```
+no growth        the count of uncertain assertions inside a declared scope
+                 may not rise above a baseline the caller supplies
+discharge on     an uncertain assertion citing a file this change edits MUST be
+touch            re-asserted or deleted in this change
+```
+
+The second rule is the load-bearing one. The file under the author's cursor is the
+only moment discharge is cheap; every other moment it is archaeology nobody
+volunteers for. A scheduled "review your uncertain assertions" job is
+disclosure-without-discharge again, with a cron.
+
+**Deletion is a legal discharge and often the right one.** An assertion that has
+gone uncertain across several changes to its own cited artifact is not stale, it is
+abandoned. A gate that only offers re-assertion is satisfied by rubber stamps, which
+launders an unverified claim into `confirmed` — the worse failure.
+
+There is deliberately no `until:` field on a decayed assertion. Decay is DERIVED, so
+it has no author to carry an exit condition, and the exit is already known and
+mechanical — re-verify against the new content. Writing that in a field is writing
+down the tool's own algorithm. The gap is not a missing condition; it is a missing
+obligation, and the two rules above are it.
+
+The baseline is a caller's number and MUST NOT be a field in the model: a count is
+DERIVED, and an authored copy of it goes stale exactly as INV-001 says.
+
 ### 13.1 Declared versus measured
 
 `coverage_declared: complete | partial | stub` on a Flow is an authored claim and can
@@ -840,3 +870,4 @@ are enforced mechanically instead of by careful reading.
 | INV-021 | Concurrency is the absence of `next` | 5.5 |
 | INV-022 | Locators use symbols, not line numbers | 6.1 |
 | INV-023 | A changed file in scope must be modelled | 13.0 |
+| INV-024 | Decay must be discharged in the change that touches it | 13.0.1 |
