@@ -183,6 +183,10 @@ class Model:
         # any well-formed state id resolves.
         return kind == "state"
 
+    def repo_prefix(self) -> str:
+        """Where the model's locators sit relative to the repository root."""
+        return str(self.system.get("repo_prefix", "") or "")
+
     def artifact_table(self) -> dict[str, list[str]]:
         """INV-011.1 reverse index: locator -> [assertion ids] (DERIVED)."""
         table: dict[str, list[str]] = {}
@@ -196,7 +200,7 @@ class Model:
         hits: set[str] = set()
         for assertion in self.assertions.values():
             for ev in assertion.get("evidence") or []:
-                if _locator_matches(ev["locator"], locator):
+                if _locator_matches(ev["locator"], locator, self.repo_prefix()):
                     hits |= {
                         a for a in assertion.get("about") or [] if kind_of(a) == "node"
                     }
@@ -206,7 +210,7 @@ class Model:
         flows: set[str] = set()
         for assertion in self.assertions.values():
             for ev in assertion.get("evidence") or []:
-                if not _locator_matches(ev["locator"], locator):
+                if not _locator_matches(ev["locator"], locator, self.repo_prefix()):
                     continue
                 flows |= {a for a in assertion.get("about") or [] if kind_of(a) == "flow"}
                 if assertion.get("_flow"):
@@ -215,18 +219,37 @@ class Model:
 
 
 def _norm_path(path: str) -> str:
-    return path[2:] if path.startswith("./") else path
+    path = path[2:] if path.startswith("./") else path
+    return path.rstrip("/") if path.endswith("/") and path != "/" else path
 
 
-def _locator_matches(declared: str, changed: str) -> bool:
+def _locator_matches(declared: str, changed: str, prefix: str = "") -> bool:
+    """Compare a declared locator with a path from a diff.
+
+    Both sides are brought to repository-root coordinates first. A model that
+    lives under a package in a monorepo declares that package as its prefix;
+    without it, every path a diff produces misses, and a miss is invisible -
+    it lands in `unknown` as though nothing were known about the file.
+    """
     dfile = _norm_path(declared.split("#", 1)[0])
     cfile = _norm_path(changed.split("#", 1)[0])
-    if dfile.endswith("/**"):
+    if prefix:
+        prefix = _norm_path(prefix).strip("/")
+        dfile = f"{prefix}/{dfile}"
+        if cfile == prefix:
+            cfile = ""  # the whole package changed
+    is_glob = dfile.endswith("/**")
+
+    if is_glob:
         if not cfile.startswith(dfile[:-2]):
             return False
+    elif cfile == "" or (cfile.count(".") == 0 and dfile.startswith(cfile + "/")):
+        # a directory in the changed set covers every locator beneath it
+        return True
     elif dfile != cfile:
         return False
-    if "#" in changed and "#" in declared and not dfile.endswith("/**"):
+
+    if "#" in changed and "#" in declared and not is_glob:
         return declared.split("#", 1)[1] == changed.split("#", 1)[1]
     return True
 
@@ -800,7 +823,7 @@ def impact(model: Model, changed: list[str], depth: int = 2) -> dict:
     unknown: list[str] = []
 
     for locator in changed:
-        matched = [d for d in table if _locator_matches(d, locator)]
+        matched = [d for d in table if _locator_matches(d, locator, model.repo_prefix())]
         if not matched:
             unknown.append(locator)
             continue
@@ -932,6 +955,43 @@ def graph_diff(a: Model, b: Model) -> dict:
     return out
 
 
+def ratchet(model: Model, changed: list[str], scope: list[str] | None = None) -> dict:
+    """INV-023. A file you are editing must be modelled.
+
+    Coverage and the `unknown` impact tier disclose that something is unmodelled;
+    neither makes it less unmodelled next month. Measured elsewhere: a freeze of
+    12,454 comments across 965 files held for as long as nothing asked "you are
+    already editing this file, so why is it still unaccounted for". Disclosure is
+    not discharge.
+
+    `scope` is what makes this adoptable and what tightens over time: the gate
+    applies only to changed files under a declared prefix, and the prefix grows.
+    A gate nobody can pass gets bypassed, and a bypassed gate teaches everyone to
+    bypass the next one.
+    """
+    prefix = model.repo_prefix()
+    table = model.artifact_table()
+    in_scope, mapped, unmapped = [], [], []
+
+    for path in changed:
+        clean = _norm_path(path)
+        if scope and not any(clean.startswith(_norm_path(s).rstrip("/")) for s in scope):
+            continue
+        in_scope.append(clean)
+        if any(_locator_matches(declared, clean, prefix) for declared in table):
+            mapped.append(clean)
+        else:
+            unmapped.append(clean)
+
+    return {
+        "scope": scope or ["(everything changed)"],
+        "in_scope": sorted(in_scope),
+        "mapped": sorted(mapped),
+        "unmapped": sorted(unmapped),
+        "out_of_scope": sorted({_norm_path(c) for c in changed} - set(in_scope)),
+    }
+
+
 # ------------------------------------------------------------------ coverage
 
 
@@ -1026,7 +1086,14 @@ def observe(
         raise SystemExit(f"unknown assertion: {assertion_id}")
 
     declared = {ev["locator"]: ev for ev in assertion.get("evidence") or []}
-    match = next((loc for loc in declared if _locator_matches(loc, reference)), None)
+    match = next(
+        (
+            loc
+            for loc in declared
+            if _locator_matches(loc, reference, model.repo_prefix())
+        ),
+        None,
+    )
     if match is None:
         raise SystemExit(
             f"{assertion_id} declares no evidence reference matching '{reference}'.\n"

@@ -1383,11 +1383,86 @@ def tool_content_not_history():
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+def tool_ratchet():
+    """Disclosure is not discharge: a changed file in scope must be modelled."""
+    model = T.Model(EXAMPLE)
+
+    mapped = T.ratchet(model, ["src/payment/PaymentProcessor.ts"], ["src/"])
+    check(
+        "TOOL ratchet",
+        "a changed file that maps to a node passes",
+        mapped["unmapped"] == [] and mapped["mapped"],
+        str(mapped),
+    )
+
+    gap = T.ratchet(model, ["src/refund/RefundService.ts"], ["src/"])
+    check(
+        "TOOL ratchet",
+        "a changed file that maps to nothing is rejected, not merely disclosed",
+        gap["unmapped"] == ["src/refund/RefundService.ts"],
+        str(gap),
+    )
+
+    scoped = T.ratchet(model, ["src/refund/RefundService.ts"], ["src/payment/"])
+    check(
+        "TOOL ratchet",
+        "scope is what makes it adoptable — outside it, nothing is gated",
+        scoped["unmapped"] == [] and scoped["out_of_scope"],
+        str(scoped),
+    )
+    check(
+        "TOOL ratchet",
+        "with no scope, every changed file is gated",
+        T.ratchet(model, ["src/refund/RefundService.ts"], None)["unmapped"] != [],
+    )
+
+
+def tool_monorepo_prefix():
+    """spec 11: a locator and a diff path have to be in the same coordinates."""
+    check(
+        "TOOL monorepo prefix",
+        "without a prefix, a monorepo diff path misses and the miss is invisible",
+        not T._locator_matches(
+            "src/payment/Processor.ts#charge", "packages/api/src/payment/Processor.ts"
+        ),
+    )
+    check(
+        "TOOL monorepo prefix",
+        "with the package declared, the same path matches",
+        T._locator_matches(
+            "src/payment/Processor.ts#charge",
+            "packages/api/src/payment/Processor.ts",
+            "packages/api",
+        ),
+    )
+    check(
+        "TOOL monorepo prefix",
+        "a directory in the changed set covers the locators beneath it",
+        T._locator_matches("src/payment/Processor.ts#charge", "src/payment"),
+    )
+    check(
+        "TOOL monorepo prefix",
+        "a leading ./ is not a different file",
+        T._locator_matches(
+            "src/payment/Processor.ts#charge", "./src/payment/Processor.ts"
+        ),
+    )
+    check(
+        "TOOL monorepo prefix",
+        "a different file is still a different file",
+        not T._locator_matches(
+            "src/payment/Processor.ts#charge", "src/payment/Processor.tsx"
+        ),
+    )
+
+
 TOOLING = [
     tool_init,
     tool_observe,
     tool_artifact_changed,
     tool_content_not_history,
+    tool_ratchet,
+    tool_monorepo_prefix,
     tool_explore,
 ]
 

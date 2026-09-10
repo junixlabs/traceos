@@ -12,6 +12,7 @@ nodes:
   - { id: node.trace.supersede,   type: action,   name: Mint a new id and record supersedes }
   - { id: node.trace.traverse,    type: action,   name: Traverse the graph }
   - { id: node.trace.tier,        type: action,   name: Tier the impact }
+  - { id: node.trace.gate,        type: decision, name: Reject growth in unknown }
 relationships:
   - { type: next, source: node.trace.open-change, target: node.trace.resolve }
   - { type: next, source: node.trace.resolve,     target: node.trace.identity }
@@ -20,8 +21,9 @@ relationships:
   - { type: next, source: node.trace.supersede,   target: node.trace.traverse }
   - { type: next, source: node.trace.traverse,    target: node.trace.tier }
   - { type: depends_on, source: node.trace.resolve, target: state.model.established }
-  - { type: emits, source: node.trace.tier, target: event.change.traced }
-  - { type: transitions_to, source: node.trace.tier, target: state.impact.tiered }
+  - { type: next, source: node.trace.tier, target: node.trace.gate }
+  - { type: emits, source: node.trace.gate, target: event.change.traced }
+  - { type: transitions_to, source: node.trace.gate, target: state.impact.tiered }
 outcomes:
   - { id: trace.tiered, states: [{ subject: impact, value: tiered }] }
 assertions:
@@ -34,6 +36,15 @@ assertions:
       - { kind: implementation, locator: "tools/engine.py#impact" }
       - { kind: test, locator: "tests/run_tests.py#inv_impact_ne_changed_files" }
       - { kind: documentation, locator: "docs/semantic-specification.md#INV-019 IMPACT-NE-FILES" }
+  - id: assert.trace.unknown-is-gated
+    claim: "a changed file in scope that maps to no node fails the gate, so unknown rejects growth instead of only disclosing it"
+    subject: change.gate
+    lifecycle: current
+    about: [node.trace.gate]
+    evidence:
+      - { kind: implementation, locator: "tools/engine.py#ratchet" }
+      - { kind: implementation, locator: "tools/traceos.py" }
+      - { kind: configuration, locator: ".github/workflows/ci.yml" }
   - id: assert.trace.unknown-is-not-safe
     claim: "a locator that maps to nothing lands in unknown, never in silence"
     subject: change.unknown

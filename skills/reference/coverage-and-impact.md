@@ -67,6 +67,18 @@ that list to find files that map to no node.
 
 `partial` is the normal state of a healthy model. Models start at one flow and grow.
 
+## INV-023 RATCHET-ON-CHANGE
+
+Everything above **discloses**. Nothing above **discharges**.
+
+A changed file inside a declared scope that maps to no Node fails the gate. Without
+that, `unknown` and `coverage_declared: partial` are honest labels on a model that
+never gets less partial — the "may be stale" header, which readers learn to skip.
+
+`scope` is what makes it adoptable and what tightens over time. Gate only what you
+have modelled, then grow the prefix. A gate nobody can pass gets bypassed, and a
+bypassed gate teaches everyone to bypass the next one.
+
 ## INV-012 NO-PERCENT-COVERAGE
 
 **Never report a percentage. Never draw a green 100% bar.**

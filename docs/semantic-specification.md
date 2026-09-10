@@ -550,6 +550,15 @@ entity.
 
 ## 11. Artifacts and the reverse index
 
+### 11.0 One coordinate system
+
+A locator and a path from a diff MUST be compared in repository-root coordinates. A
+model living under a package in a monorepo declares `repo_prefix` on its System.
+
+Without it every path a diff produces misses — and a miss is **invisible**, because
+it lands in `unknown` exactly as though nothing were known about the file. A
+directory in the changed set covers every locator beneath it.
+
 ### 11.1 Artifact is DERIVED
 
 Nobody authors an Artifact. The Artifact table is the union of locators appearing in
@@ -634,6 +643,27 @@ carry all four tiers, including an empty `unknown`.
 
 **Absence is not in the model**, so UNMODELED can never be found by reading the
 model. A coverage query MUST take the repository file list as input.
+
+### 13.0 INV-023 RATCHET-ON-CHANGE
+
+Coverage and the `unknown` impact tier **disclose** that something is unmodelled.
+Neither makes it less unmodelled next month.
+
+A changed file inside a declared scope that maps to no Node MUST fail. Disclosure is
+not discharge: a warning that nothing acts on is a status header, and readers learn
+to skip it.
+
+```
+ratchet(model, changed_files, scope) -> fails on any file in scope mapping to no Node
+```
+
+`scope` is what makes this adoptable, and it is the thing that tightens: the gate
+covers changed files under a declared prefix, and the prefix grows. A gate nobody can
+pass gets bypassed, and a bypassed gate teaches everyone to bypass the next one.
+
+Measured elsewhere, in a repository running a comparable layer: a freeze of 12,454
+annotations across 965 files held for as long as nothing asked *"you are already
+editing this file, so why is it still unaccounted for"*.
 
 ### 13.1 Declared versus measured
 
@@ -797,3 +827,4 @@ are enforced mechanically instead of by careful reading.
 | INV-020 | Every verification appends an observation | 6.1 |
 | INV-021 | Concurrency is the absence of `next` | 5.5 |
 | INV-022 | Locators use symbols, not line numbers | 6.1 |
+| INV-023 | A changed file in scope must be modelled | 13.0 |

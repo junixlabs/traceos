@@ -33,6 +33,7 @@ from engine import (
     init,
     integrity,
     observe,
+    ratchet,
     resolve,
     validate,
 )
@@ -52,7 +53,10 @@ def parse_context(pairs: list[str]) -> dict:
 def read_repo_files(path: str | None) -> list[str] | None:
     if not path:
         return None
-    lines = pathlib.Path(path).read_text().splitlines()
+    target = pathlib.Path(path)
+    if not target.is_file():
+        raise SystemExit(f"{path}: not a file. This flag takes a file listing paths, not a git ref.")
+    lines = target.read_text().splitlines()
     return [line.strip() for line in lines if line.strip()]
 
 
@@ -109,6 +113,18 @@ def main() -> int:
     p = sub.add_parser("coverage")
     p.add_argument("model")
     p.add_argument("--repo-files", required=True)
+    p.add_argument("--json", action="store_true")
+
+    p = sub.add_parser("ratchet")
+    p.add_argument("model")
+    p.add_argument("--changed", action="append", default=[])
+    p.add_argument("--changed-from", help="file listing changed paths, one per line")
+    p.add_argument(
+        "--scope",
+        action="append",
+        default=[],
+        help="only gate changed files under this prefix; repeatable, and it grows",
+    )
     p.add_argument("--json", action="store_true")
 
     p = sub.add_parser("explore")
@@ -249,6 +265,25 @@ def main() -> int:
                 for item in result[tier]:
                     print(f"  {item}")
         return 0
+
+    if args.cmd == "ratchet":
+        changed = list(args.changed)
+        if args.changed_from:
+            changed += read_repo_files(args.changed_from) or []
+        result = ratchet(model, changed, args.scope or None)
+        if args.json:
+            print(json.dumps(result, indent=2))
+        else:
+            print(f"scope: {', '.join(result['scope'])}")
+            print(
+                f"{len(result['mapped'])} of {len(result['in_scope'])} changed files "
+                f"in scope map to a node"
+            )
+            for path in result["unmapped"]:
+                print(f"  UNMAPPED  {path}")
+            if result["out_of_scope"]:
+                print(f"({len(result['out_of_scope'])} changed files outside the scope)")
+        return 1 if result["unmapped"] else 0
 
     if args.cmd == "coverage":
         cov = coverage(model, read_repo_files(args.repo_files), now)
