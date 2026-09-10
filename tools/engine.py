@@ -506,36 +506,59 @@ def computed_confidence(
     Confidence must be able to fall with nobody editing a file: an artifact that
     moved under an observation invalidates it, and an observation whose ref cannot
     be checked is capped rather than trusted.
-    """
-    obs = [o for o in model.observations if o.get("assertion") == assertion_id]
-    if not obs:
-        return "uncertain"
-    obs.sort(key=lambda o: o["observed_at"])
-    latest = obs[-1]
-    if latest.get("supports") in ("refutes", "inconclusive"):
-        return "uncertain"
 
-    observed = dt.datetime.fromisoformat(latest["observed_at"].replace("Z", "+00:00"))
-    if observed.tzinfo is None:
-        observed = observed.replace(tzinfo=dt.UTC)
-    if (at_time - observed).days > model.staleness_days():
-        return "likely"
+    Asked per reference, of its most recent observation only. An assertion is as
+    well supported as its weakest currently-declared reference, and a superseded
+    observation of the same reference never vetoes a fresher one.
+    """
+    assertion = model.assertions.get(assertion_id) or {}
+    declared = {ev["locator"] for ev in assertion.get("evidence") or []}
+
+    # An observation about a reference the assertion no longer declares is history,
+    # not support: re-anchoring a locator moves the claim to an address nobody has
+    # checked yet. Counting it would let a rename pin confidence forever.
+    latest: dict[str, dict] = {}
+    for observation in model.observations:
+        if observation.get("assertion") != assertion_id:
+            continue
+        reference = observation.get("reference")
+        if declared and reference not in declared:
+            continue
+        current = latest.get(reference)
+        if current is None or observation["observed_at"] >= current["observed_at"]:
+            latest[reference] = observation
+    if not latest:
+        return "uncertain"
 
     verified = True
-    if git and git.available:
-        for observation in obs:
-            if observation.get("supports") != "supports":
-                continue
-            ref, ref_path = observation.get("observed_ref"), observation.get("reference")
-            if not ref or not ref_path:
-                continue
-            changed = git.changed_since(ref, ref_path.split("#", 1)[0])
-            if changed is True:
-                return "uncertain"
-            if changed is None:
-                verified = False
+    supporting: list[dict] = []
+    oldest = None
 
-    supporting = [o for o in obs if o.get("supports") == "supports"]
+    for reference, observation in latest.items():
+        if observation.get("supports") in ("refutes", "inconclusive"):
+            return "uncertain"
+
+        observed = dt.datetime.fromisoformat(
+            observation["observed_at"].replace("Z", "+00:00")
+        )
+        if observed.tzinfo is None:
+            observed = observed.replace(tzinfo=dt.UTC)
+        oldest = observed if oldest is None else min(oldest, observed)
+
+        if git and git.available:
+            ref = observation.get("observed_ref")
+            if ref and reference:
+                changed = git.changed_since(ref, reference.split("#", 1)[0])
+                if changed is True:
+                    return "uncertain"
+                if changed is None:
+                    verified = False
+
+        supporting.append(observation)
+
+    if oldest is not None and (at_time - oldest).days > model.staleness_days():
+        return "likely"
+
     kinds = {o.get("kind", "implementation") for o in supporting}
     if verified and len(supporting) >= 2 and len(kinds) >= 2:
         return "confirmed"
@@ -562,7 +585,13 @@ def validate_evidence(model: Model) -> list[Finding]:
                         where,
                     )
                 )
-        if not any(o.get("assertion") == aid for o in model.observations):
+        declared = [ev["locator"] for ev in assertion.get("evidence") or []]
+        observed = {
+            o.get("reference") for o in model.observations if o.get("assertion") == aid
+        }
+        orphaned = observed - set(declared)
+
+        if declared and not observed:
             findings.append(
                 Finding(
                     "warn",
@@ -572,6 +601,25 @@ def validate_evidence(model: Model) -> list[Finding]:
                     where,
                 )
             )
+        else:
+            for reference in declared:
+                if reference in observed:
+                    continue
+                cause = (
+                    " — it looks re-anchored from "
+                    f"'{sorted(orphaned)[0]}', and verification does not move with a "
+                    "locator"
+                    if orphaned
+                    else ""
+                )
+                findings.append(
+                    Finding(
+                        "warn",
+                        "REFERENCE_NEVER_OBSERVED",
+                        f"{aid}: '{reference}' has no observation{cause} (INV-020)",
+                        where,
+                    )
+                )
     return findings
 
 

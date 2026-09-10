@@ -330,6 +330,13 @@ computed_confidence(assertion, at_time):
     otherwise                                -> likely
 ```
 
+Only observations naming a reference the Assertion **currently declares**
+contribute. An observation about a reference that has since been re-anchored or
+removed is history, not support — otherwise renaming a locator would pin confidence
+to an address the claim no longer uses. A declared reference with no observation MUST be
+reported (`REFERENCE_NEVER_OBSERVED`), which is what surfaces a re-anchor that was
+never re-verified — and which clears once it is.
+
 `artifact_changed_since` returns TRUE, FALSE or UNKNOWN. **Unverifiable is not the
 same as verified**: an observation whose `observed_ref` is not in the repository
 caps confidence at `likely` and MUST be reported (`OBSERVED_REF_UNVERIFIABLE`),
