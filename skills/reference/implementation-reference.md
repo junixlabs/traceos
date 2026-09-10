@@ -76,6 +76,22 @@ node.payment.process
     - { kind: implementation, locator: "...#AdyenAdapter.charge" }
 ```
 
+## What a locator check actually verifies
+
+`check_locators` confirms the file exists and the anchor appears in it. It does not
+resolve the symbol — it does not parse the host language, and it never will.
+
+A dotted anchor like `#StripeAdapter.charge` is therefore checked **one segment
+deep**: if `charge` appears anywhere in the file, including in a comment saying it
+was removed, the anchor resolves. That is a real hole, and it is reported rather
+than passed silently (INV-025) — the tool names the anchor and says which segment
+it verified.
+
+Measured across both reference models: 41 locators, 36 anchored, **0** dotted. The
+hole has never fired because nothing has written the shape that triggers it. That
+makes it a latent affordance rather than live drift — the syntax invites something
+the checker half-honours. Prefer an anchor the tool can verify in full.
+
 ## Locators have to survive refactoring
 
 Use symbol paths, never line numbers (INV-022). Renaming an artifact means fixing

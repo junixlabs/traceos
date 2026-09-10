@@ -18,8 +18,11 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 import engine as T
 
 
-def anchor_present(text: str, anchor: str) -> bool:
-    """Symbol, heading or test name. Loose on purpose: this catches rot, it does not
+def anchor_present(text: str, anchor: str) -> str:
+    """Returns "exact", "tail" or "" - never a bare bool, because the caller has to
+    be able to say which of the two it got (INV-025).
+
+    Symbol, heading or test name. Loose on purpose: this catches rot, it does not
     parse the host language.
 
     The dotted-tail fallback is for `Class.method`, so it is refused for anything
@@ -27,11 +30,11 @@ def anchor_present(text: str, anchor: str) -> bool:
     `9.` through that fallback, which is the exact rot this file exists to catch.
     """
     if anchor in text:
-        return True
+        return "exact"
     if " " in anchor:
-        return False
+        return ""
     tail = anchor.rsplit(".", 1)[-1]
-    return bool(tail) and tail in text
+    return "tail" if tail and tail in text else ""
 
 
 def main() -> int:
@@ -45,6 +48,7 @@ def main() -> int:
 
     missing_file: list[str] = []
     missing_anchor: list[str] = []
+    weak_anchor: list[str] = []
     checked = 0
 
     for aid, assertion in sorted(model.assertions.items()):
@@ -56,10 +60,18 @@ def main() -> int:
             if not target.is_file():
                 missing_file.append(f"{aid}: {locator}")
                 continue
-            if anchor and not anchor_present(
+            if not anchor:
+                continue
+            how = anchor_present(
                 target.read_text(encoding="utf-8", errors="ignore"), anchor
-            ):
+            )
+            if not how:
                 missing_anchor.append(f"{aid}: {locator}")
+            elif how == "tail":
+                weak_anchor.append(
+                    f"{aid}: {locator} (only '{anchor.rsplit('.', 1)[-1]}' "
+                    f"was verified, anywhere in the file)"
+                )
 
     for label, items in (
         ("file does not exist", missing_file),
@@ -69,6 +81,16 @@ def main() -> int:
             print(f"\n{label} ({len(items)}):")
             for item in items:
                 print(f"  {item}")
+
+    if weak_anchor:
+        print(f"\nverified by tail only, not resolved ({len(weak_anchor)}):")
+        for item in weak_anchor:
+            print(f"  {item}")
+        print(
+            "  A dotted anchor is checked one segment deep: a deleted method on a\n"
+            "  surviving class still resolves. This is reported rather than passed\n"
+            "  silently (INV-025); prefer an anchor this tool can verify in full."
+        )
 
     total = len(missing_file) + len(missing_anchor)
     print(f"\n{checked - total}/{checked} evidence locators resolve")
