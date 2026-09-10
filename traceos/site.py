@@ -5,7 +5,7 @@ The site exists for the one thing a repository page cannot show — the explorer
 running against a real model. Everything on it is generated from the models in this
 repository, so it cannot describe a version of TraceOS that does not exist.
 
-    python3 tools/site.py --out site
+    python3 -m traceos.site --out site
 """
 
 from __future__ import annotations
@@ -16,9 +16,8 @@ import html
 import pathlib
 import sys
 
-sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
-import engine as T
-import explore
+from . import engine as T
+from . import explore
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 REPO = "https://github.com/junixlabs/traceos"

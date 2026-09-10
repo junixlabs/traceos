@@ -17,10 +17,11 @@ import shutil
 import sys
 import tempfile
 
-sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent / "tools"))
-import engine as T
-import traceos as cli
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent))
 import yaml
+
+import traceos as cli
+from traceos import engine as T
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 EXAMPLE = ROOT / "examples" / "ecommerce"
@@ -568,7 +569,7 @@ def case_09_rollback():
             "rolling back returns an EMPTY diff to the baseline",
             T.graph_diff(T.Model(EXAMPLE), sb.model()) == {},
         )
-        schema = json.loads((ROOT / "schema" / "traceos.schema.json").read_text())
+        schema = json.loads(T.SCHEMA_PATH.read_text())
         check(
             "09 Rollback",
             "no Rollback entity exists in the vocabulary",
@@ -609,7 +610,7 @@ def case_10_partial_failure():
             ids == {"notification.sent", "notification.failed"},
             sorted(ids),
         )
-        schema = json.loads((ROOT / "schema" / "traceos.schema.json").read_text())
+        schema = json.loads(T.SCHEMA_PATH.read_text())
         flow_props = schema["allOf"][1]["then"]["properties"]
         check(
             "10 Partial Failure",
@@ -699,7 +700,7 @@ def case_12_human_decision():
         )
         == 2,
     )
-    schema = json.loads((ROOT / "schema" / "traceos.schema.json").read_text())
+    schema = json.loads(T.SCHEMA_PATH.read_text())
     types = schema["$defs"]["node"]["properties"]["type"]["enum"]
     check(
         "12 Human Decision",
@@ -829,7 +830,7 @@ def inv_impact_ne_changed_files():
 
 
 def inv_state_ne_lifecycle():
-    schema = json.loads((ROOT / "schema" / "traceos.schema.json").read_text())
+    schema = json.loads(T.SCHEMA_PATH.read_text())
     check(
         "INV State != Lifecycle",
         "State is subject+value, with no lifecycle field",
@@ -862,7 +863,7 @@ def inv_state_ne_health():
         "authoring health is an error (INV-018)",
         "DERIVED_IN_AUTHORED" in codes(T.validate_tiers(m)),
     )
-    blob = json.dumps(json.loads((ROOT / "schema" / "traceos.schema.json").read_text()))
+    blob = json.dumps(json.loads(T.SCHEMA_PATH.read_text()))
     check(
         "INV State != Health",
         "health is not part of the authored vocabulary",
@@ -987,12 +988,16 @@ def tool_init():
         out = tmp / "traceos"
         files = T.init(tmp, out, "Demo")
         check("TOOL init", "indexes the repository file list", "src/svc.ts" in files)
-        for asset in ("tools", "schema", "skills"):
-            check(
-                "TOOL init",
-                f"scaffold carries {asset}/ so it runs standalone",
-                (out / asset).is_dir(),
-            )
+        check(
+            "TOOL init",
+            "scaffold carries skills/ so the agent reads them locally",
+            (out / "skills").is_dir(),
+        )
+        check(
+            "TOOL init",
+            "scaffold does not freeze a copy of the engine",
+            not (out / "tools").exists() and not (out / "schema").exists(),
+        )
         check("TOOL init", "writes repo-files.txt", (out / "repo-files.txt").exists())
         findings = T.validate(T.Model(out), None, {}, NOW)
         errors = [f for f in findings if f.level == "error"]
@@ -1263,7 +1268,7 @@ def tool_explore():
     import re
     import xml.etree.ElementTree as ET
 
-    import explore as E
+    from traceos import explore as E
 
     contexts = [{"tenant": "a"}, {"tenant": "b"}]
     listed = (EXAMPLE / "repo-files.txt").read_text().splitlines()
@@ -1560,8 +1565,7 @@ def tool_decay_ratchet():
 
 def tool_anchor_rot():
     """A heading that renumbers is rot, and the dotted-tail fallback used to hide it."""
-    sys.path.insert(0, str(ROOT / "tools"))
-    import check_locators
+    from traceos import check_locators
 
     check(
         "TOOL anchor rot",

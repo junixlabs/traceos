@@ -17,12 +17,12 @@ new check, go straight to a pull request.
 ## The loop
 
 ```bash
-pip install pyyaml jsonschema ruff
+pip install pyyaml jsonschema ruff .
 
 python3 tests/run_tests.py -v                    # 13 cases, 7 invariants, 4 tooling groups
-python3 tools/check_docs.py                      # invariants defined, cited, enforced
-python3 tools/check_locators.py examples/traceos-itself
-ruff check tools tests && ruff format tools tests
+python3 -m traceos.check_docs                    # invariants defined, cited, enforced
+python3 -m traceos.check_locators examples/traceos-itself
+ruff check traceos tests && ruff format traceos tests
 ```
 
 CI runs the same four, on Python 3.11, 3.12 and 3.13.
@@ -39,7 +39,7 @@ The specification carries 22 numbered invariants, digested for agents in
   needs the repository file list as input, and must report counts and named gaps
   rather than a percentage.
 
-`tools/check_docs.py` fails if an invariant is defined in the specification but not
+`traceos/check_docs.py` fails if an invariant is defined in the specification but not
 cited by a skill or not traceable in the engine. Adding a rule means touching all
 three.
 

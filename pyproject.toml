@@ -1,3 +1,7 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
 [project]
 name = "traceos"
 version = "0.1.0"
@@ -7,9 +11,18 @@ license = { file = "LICENSE" }
 requires-python = ">=3.11"
 dependencies = ["pyyaml>=6", "jsonschema>=4"]
 
+[project.scripts]
+traceos = "traceos.cli:main"
+
 [project.urls]
 Homepage = "https://github.com/junixlabs/traceos"
 Specification = "https://github.com/junixlabs/traceos/blob/main/docs/semantic-specification.md"
+
+[tool.hatch.build.targets.wheel]
+packages = ["traceos"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"skills" = "traceos/skills"
 
 [tool.ruff]
 line-length = 90

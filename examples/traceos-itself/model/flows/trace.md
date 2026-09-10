@@ -33,7 +33,7 @@ assertions:
     lifecycle: current
     about: [node.trace.tier]
     evidence:
-      - { kind: implementation, locator: "tools/engine.py#impact" }
+      - { kind: implementation, locator: "traceos/engine.py#impact" }
       - { kind: test, locator: "tests/run_tests.py#inv_impact_ne_changed_files" }
       - { kind: documentation, locator: "docs/semantic-specification.md#INV-019 IMPACT-NE-FILES" }
   - id: assert.trace.unknown-is-gated
@@ -42,8 +42,8 @@ assertions:
     lifecycle: current
     about: [node.trace.gate]
     evidence:
-      - { kind: implementation, locator: "tools/engine.py#ratchet" }
-      - { kind: implementation, locator: "tools/traceos.py" }
+      - { kind: implementation, locator: "traceos/engine.py#ratchet" }
+      - { kind: implementation, locator: "traceos/cli.py" }
       - { kind: configuration, locator: ".github/workflows/ci.yml" }
   - id: assert.trace.unknown-is-not-safe
     claim: "a locator that maps to nothing lands in unknown, never in silence"
@@ -51,7 +51,7 @@ assertions:
     lifecycle: current
     about: [node.trace.resolve]
     evidence:
-      - { kind: implementation, locator: "tools/engine.py#impact" }
+      - { kind: implementation, locator: "traceos/engine.py#impact" }
       - { kind: test, locator: "tests/run_tests.py#inv_impact_ne_changed_files" }
 ---
 

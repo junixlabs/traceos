@@ -82,19 +82,20 @@ full artifact mapping does not mean the behavior is modelled.
 
 ## Quick start
 
-Python 3.11+, `pyyaml`, `jsonschema`.
+Python 3.11+. Install the engine, then drive it from anywhere:
 
 ```bash
-# scaffold a model into an existing repository
-python3 tools/traceos.py init /path/to/repo --name "My System"
+pip install .
+traceos --help
+traceos init /path/to/repo --name "My System"
 
 # the reference model
 cd examples/ecommerce
-python3 ../../tools/traceos.py validate . --repo-files repo-files.txt
-python3 ../../tools/traceos.py resolve  . --context tenant=a    # → gateway v2
-python3 ../../tools/traceos.py resolve  . --context tenant=b    # → gateway v1
-python3 ../../tools/traceos.py impact   . --changed "src/refund/RefundService.ts"
-python3 ../../tools/traceos.py explore  . --repo-files repo-files.txt --out /tmp/x.html
+traceos validate . --repo-files repo-files.txt
+traceos resolve  . --context tenant=a    # → gateway v2
+traceos resolve  . --context tenant=b    # → gateway v1
+traceos impact   . --changed "src/refund/RefundService.ts"
+traceos explore  . --repo-files repo-files.txt --out /tmp/x.html
 ```
 
 One graph answers differently per tenant without being forked. A file that maps to
@@ -103,7 +104,7 @@ nothing comes back as `unknown`, not as silence.
 Record what you actually checked, stamped with the real commit:
 
 ```bash
-python3 tools/traceos.py observe traceos \
+traceos observe traceos \
   --assertion assert.invoice.issues \
   --reference "src/billing/InvoiceService.ts#issue" --supports supports
 ```
@@ -118,14 +119,14 @@ confidence and is reported — unverifiable is not the same as verified.
 ```
 docs/semantic-specification.md   the definition — 22 numbered invariants
 docs/decisions/                  14 ADRs — why each rule exists
-schema/traceos.schema.json       frontmatter structure
+traceos/schema/traceos.schema.json  frontmatter structure
 examples/ecommerce/              reference model touching every entity
 examples/traceos-itself/         TraceOS modelled in TraceOS
 skills/                          three agent skills over a shared reference/
-tools/engine.py                  model, validation, resolution, impact, coverage
-tools/explore.py                 the HTML view
-tools/site.py                    the Pages site, built from the models
-tools/traceos.py                 command line: init, observe, validate, resolve,
+traceos/engine.py                model, validation, resolution, impact, coverage
+traceos/explore.py               the HTML view
+traceos/site.py                  the Pages site, built from the models
+traceos/cli.py                   command line: init, observe, validate, resolve,
                                  impact, diff, coverage, explore
 tests/run_tests.py               13 stress cases, 7 invariants, 4 tooling groups
 ```

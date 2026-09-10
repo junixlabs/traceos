@@ -25,8 +25,8 @@ import json
 import pathlib
 import sys
 
-import explore
-from engine import (
+from . import explore
+from .engine import (
     Git,
     Model,
     coverage,
@@ -183,7 +183,7 @@ def main() -> int:
         )
         print(f"  2. replace {rel}/model/flows/example.md with your most important flow")
         print(
-            f"  3. cd {rel} && python3 tools/traceos.py validate . "
+            f"  3. cd {rel} && traceos validate . "
             f"--repo-files repo-files.txt --repo {repo}"
         )
         print(f"  4. point your agent at {rel}/skills/understanding-system/SKILL.md")

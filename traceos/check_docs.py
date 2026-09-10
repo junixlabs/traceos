@@ -5,7 +5,7 @@ Three copies of the rules exist by design: the specification defines them, the s
 reference digests them for agents, and the engine enforces them. Three copies drift.
 This is the check that keeps them from drifting silently.
 
-    python3 tools/check_docs.py
+    python3 -m traceos.check_docs
 """
 
 from __future__ import annotations
@@ -32,8 +32,8 @@ def main() -> int:
         reference |= ids_in(path)
 
     engine: set[str] = set()
-    for name in ("engine.py", "explore.py", "traceos.py"):
-        engine |= ids_in(ROOT / "tools" / name)
+    for name in ("engine.py", "explore.py", "cli.py"):
+        engine |= ids_in(ROOT / "traceos" / name)
 
     appendix = spec_text[spec_text.index("## Appendix A") :]
     indexed = set(INV.findall(appendix))

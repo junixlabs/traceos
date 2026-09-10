@@ -24,8 +24,8 @@ assertions:
     lifecycle: current
     about: [node.render.compute, node.render.embed]
     evidence:
-      - { kind: implementation, locator: "tools/explore.py#build" }
-      - { kind: implementation, locator: "tools/site.py#main" }
+      - { kind: implementation, locator: "traceos/explore.py#build" }
+      - { kind: implementation, locator: "traceos/site.py#main" }
       - { kind: test, locator: "tests/run_tests.py#tool_explore" }
   - id: assert.render.view-not-truth
     claim: "the page is regenerated, never edited, and is excluded from the repository"

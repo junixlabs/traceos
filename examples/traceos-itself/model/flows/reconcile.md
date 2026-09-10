@@ -33,7 +33,7 @@ assertions:
     lifecycle: current
     about: [node.reconcile.observe, node.reconcile.resolve]
     evidence:
-      - { kind: implementation, locator: "tools/engine.py#computed_confidence" }
+      - { kind: implementation, locator: "traceos/engine.py#computed_confidence" }
       - { kind: test, locator: "tests/run_tests.py#tool_artifact_changed" }
       - { kind: documentation, locator: "docs/decisions/003-confidence-is-derived.md#Consequences" }
   - id: assert.reconcile.rot-is-caught
@@ -43,7 +43,7 @@ assertions:
     lifecycle: current
     about: [node.reconcile.anchors]
     evidence:
-      - { kind: implementation, locator: "tools/check_locators.py#anchor_present" }
+      - { kind: implementation, locator: "traceos/check_locators.py#anchor_present" }
       - { kind: configuration, locator: ".github/workflows/ci.yml" }
   - id: assert.reconcile.integrity-is-computed
     claim: "integrity is computed and reported, never authored or decided by the agent"
@@ -51,7 +51,7 @@ assertions:
     lifecycle: current
     about: [node.reconcile.integrity]
     evidence:
-      - { kind: implementation, locator: "tools/engine.py#integrity" }
+      - { kind: implementation, locator: "traceos/engine.py#integrity" }
       - { kind: documentation, locator: "skills/reconciling-reality/SKILL.md#Report Integrity" }
   - id: assert.reconcile.unverifiable-is-not-verified
     claim: "an observation whose ref is absent from the repository caps confidence and is reported"
@@ -60,7 +60,7 @@ assertions:
     lifecycle: current
     about: [node.reconcile.resolve]
     evidence:
-      - { kind: implementation, locator: "tools/engine.py#Git" }
+      - { kind: implementation, locator: "traceos/engine.py#Git" }
       - { kind: test, locator: "tests/run_tests.py#tool_artifact_changed" }
 ---
 

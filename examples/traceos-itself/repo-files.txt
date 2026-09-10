@@ -37,7 +37,6 @@ examples/ecommerce/README.md
 .github/workflows/codeql.yml
 .github/workflows/pages.yml
 README.md
-schema/traceos.schema.json
 SECURITY.md
 skills/README.md
 skills/reconciling-reality/SKILL.md
@@ -54,9 +53,11 @@ skills/reference/vocabulary.md
 skills/tracing-change/SKILL.md
 skills/understanding-system/SKILL.md
 tests/run_tests.py
-tools/check_docs.py
-tools/check_locators.py
-tools/engine.py
-tools/explore.py
-tools/site.py
-tools/traceos.py
+traceos/__init__.py
+traceos/check_docs.py
+traceos/check_locators.py
+traceos/cli.py
+traceos/engine.py
+traceos/explore.py
+traceos/schema/traceos.schema.json
+traceos/site.py

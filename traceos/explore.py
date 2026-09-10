@@ -14,7 +14,7 @@ import html
 import json
 import pathlib
 
-import engine as T
+from . import engine as T
 
 NODE_W, NODE_H, COL_GAP, ROW_GAP, PAD, CHIP_H = 168, 46, 96, 22, 26, 15
 
