@@ -1,0 +1,32 @@
+name: A case the vocabulary cannot express
+description: Real behavior that TraceOS has no honest way to model
+labels: ["semantics"]
+body:
+  - type: markdown
+    attributes:
+      value: >
+        There is a hard entity budget: v0.1 added one entity and removed five.
+        A new entity or relationship type needs a case that the current vocabulary
+        genuinely cannot represent — not one it represents awkwardly.
+  - type: textarea
+    id: behavior
+    attributes:
+      label: The behavior
+      description: Describe it as behavior, not as code structure.
+    validations: { required: true }
+  - type: textarea
+    id: attempted
+    attributes:
+      label: How you tried to model it, and where it broke
+      description: >
+        Show the flow you wrote. Which relationship did you reach for, and what did
+        the matrix or the validator say?
+      render: yaml
+    validations: { required: true }
+  - type: textarea
+    id: wrong
+    attributes:
+      label: What the closest available modelling gets wrong
+      description: >
+        Not "it is ugly" — what would an agent conclude from it that is false?
+    validations: { required: true }
