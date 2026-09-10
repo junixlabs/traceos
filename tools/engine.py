@@ -241,6 +241,12 @@ def _norm_path(path: str) -> str:
     return path.rstrip("/") if path.endswith("/") and path != "/" else path
 
 
+def _repo_path(locator: str, prefix: str = "") -> str:
+    """A declared locator in repository-root coordinates."""
+    path = _norm_path(locator.split("#", 1)[0])
+    return f"{_norm_path(prefix).strip('/')}/{path}" if prefix else path
+
+
 def _locator_matches(declared: str, changed: str, prefix: str = "") -> bool:
     """Compare a declared locator with a path from a diff.
 
@@ -1018,6 +1024,72 @@ def ratchet(model: Model, changed: list[str], scope: list[str] | None = None) ->
         "mapped": sorted(mapped),
         "unmapped": sorted(unmapped),
         "out_of_scope": sorted({_norm_path(c) for c in changed} - set(in_scope)),
+    }
+
+
+def decay_ratchet(
+    model: Model,
+    changed: list[str],
+    at_time: dt.datetime,
+    git: Git | None = None,
+    scope: list[str] | None = None,
+    baseline: int | None = None,
+) -> dict:
+    """INV-024. Decay is derived, so it has no author to demand an exit from.
+
+    The gap an `until:` field would try to fill is not a missing condition - the
+    condition is already known and mechanical, re-verify against the new content -
+    it is a missing obligation: who re-verifies, and when. Two rules answer that.
+
+    No growth: the count of uncertain assertions inside the scope may not rise above
+    the baseline. Discharge on touch: an uncertain assertion citing a file this
+    change edits must be re-asserted or deleted in this change. The file under the
+    author's cursor is the only moment discharge is cheap; every other moment it is
+    archaeology nobody volunteers for, which is how a freeze of 12,454 annotations
+    across 965 files held elsewhere.
+
+    Deletion is a legal discharge and often the right one. An assertion that has
+    gone uncertain across several changes to its own cited artifact is not stale,
+    it is abandoned. A gate offering only re-assertion is satisfied by rubber stamps,
+    which launders an unverified claim into `confirmed` - the worse failure.
+
+    `baseline` is a caller's number, never a field in the model: a count is DERIVED
+    and an authored copy of it would go stale exactly as INV-001 says.
+    """
+    prefix = model.repo_prefix()
+
+    def in_scope(path: str) -> bool:
+        if not scope:
+            return True
+        clean = _norm_path(path)
+        return any(clean.startswith(_norm_path(s).rstrip("/")) for s in scope)
+
+    changed_clean = [_norm_path(c) for c in changed]
+    uncertain, touched = [], []
+    for aid, assertion in model.assertions.items():
+        locators = [ev["locator"] for ev in assertion.get("evidence") or []]
+        cited = [loc for loc in locators if in_scope(_repo_path(loc, prefix))]
+        if not cited:
+            continue
+        if computed_confidence(model, aid, at_time, git) != "uncertain":
+            continue
+        uncertain.append(aid)
+        hits = [
+            loc
+            for loc in cited
+            for path in changed_clean
+            if _locator_matches(loc, path, prefix)
+        ]
+        if hits:
+            touched.append({"assertion": aid, "references": sorted(set(hits))})
+
+    grew = baseline is not None and len(uncertain) > baseline
+    return {
+        "scope": scope or ["(the whole model)"],
+        "uncertain": sorted(uncertain),
+        "baseline": baseline,
+        "grew": grew,
+        "undischarged": sorted(touched, key=lambda t: t["assertion"]),
     }
 
 

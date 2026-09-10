@@ -79,6 +79,26 @@ never gets less partial — the "may be stale" header, which readers learn to sk
 have modelled, then grow the prefix. A gate nobody can pass gets bypassed, and a
 bypassed gate teaches everyone to bypass the next one.
 
+## INV-024 DECAY-DISCHARGE
+
+The same argument, aimed at confidence instead of coverage. Confidence falling on
+its own is the mechanism working — and on its own it is still only a disclosure.
+
+- **No growth.** The uncertain count inside a declared scope may not rise above a
+  baseline the caller supplies. Never store the baseline in the model; a count is
+  DERIVED (INV-001).
+- **Discharge on touch.** An uncertain assertion citing a file this change edits is
+  re-asserted or deleted **in this change**. Not eventually, not on a sweep.
+
+**Deleting the assertion is a legal discharge, and often the honest one.** One that
+has gone uncertain across several changes to its own cited artifact is not stale, it
+is abandoned. Re-asserting without actually checking launders an unverified claim
+into `confirmed`, which is worse than the uncertainty was.
+
+Do not look for an `until:` field. Decay is derived — nobody wrote it, so nobody can
+carry an exit condition for it, and the exit is already known: re-verify against the
+new content.
+
 ## INV-012 NO-PERCENT-COVERAGE
 
 **Never report a percentage. Never draw a green 100% bar.**

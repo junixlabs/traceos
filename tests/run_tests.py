@@ -1490,6 +1490,87 @@ def tool_ratchet():
     )
 
 
+def tool_decay_ratchet():
+    """INV-024. Confidence falling is a disclosure; two rules make it an obligation."""
+    model = T.Model(EXAMPLE)
+
+    touched = T.decay_ratchet(model, ["deploy/cron.yaml"], NOW, None, ["deploy/"], 0)
+    check(
+        "TOOL decay",
+        "an uncertain assertion citing the file you are editing is undischarged",
+        [t["assertion"] for t in touched["undischarged"]] == ["assert.retry.scheduled"],
+        str(touched),
+    )
+
+    elsewhere = T.decay_ratchet(
+        model, ["src/payment/PaymentProcessor.ts"], NOW, None, ["src/"], 99
+    )
+    check(
+        "TOOL decay",
+        "editing a file no uncertain assertion cites discharges nothing",
+        elsewhere["undischarged"] == [] and not elsewhere["grew"],
+        str(elsewhere),
+    )
+
+    check(
+        "TOOL decay",
+        "the uncertain count above the baseline fails on its own, with no diff",
+        T.decay_ratchet(model, [], NOW, None, None, 0)["grew"],
+    )
+    check(
+        "TOOL decay",
+        "at or under the baseline it passes",
+        not T.decay_ratchet(model, [], NOW, None, None, 1)["grew"],
+    )
+    check(
+        "TOOL decay",
+        "no baseline is no growth rule, not a baseline of zero",
+        not T.decay_ratchet(model, [], NOW, None, None, None)["grew"],
+    )
+
+    confident = T.decay_ratchet(
+        model, ["src/order/OrderService.ts"], NOW, None, ["src/"], 99
+    )
+    check(
+        "TOOL decay",
+        "a confirmed assertion is not dragged in by touching its artifact",
+        "assert.purchase.confirms-order" not in confident["uncertain"],
+        str(confident["uncertain"]),
+    )
+
+    out = T.decay_ratchet(model, ["deploy/cron.yaml"], NOW, None, ["src/"], 99)
+    check(
+        "TOOL decay",
+        "scope bounds the decay gate too, or it is not adoptable",
+        out["undischarged"] == [] and out["uncertain"] == [],
+        str(out),
+    )
+
+
+def tool_anchor_rot():
+    """A heading that renumbers is rot, and the dotted-tail fallback used to hide it."""
+    sys.path.insert(0, str(ROOT / "tools"))
+    import check_locators
+
+    check(
+        "TOOL anchor rot",
+        "a renumbered heading no longer resolves",
+        not check_locators.anchor_present(
+            "### 9. Report Integrity", "10. Report Integrity"
+        ),
+    )
+    check(
+        "TOOL anchor rot",
+        "the dotted-tail fallback still finds a method",
+        check_locators.anchor_present("def charge(self):", "StripeAdapter.charge"),
+    )
+    check(
+        "TOOL anchor rot",
+        "an exact heading resolves",
+        check_locators.anchor_present("### Report Integrity", "Report Integrity"),
+    )
+
+
 def tool_monorepo_prefix():
     """spec 11: a locator and a diff path have to be in the same coordinates."""
     check(
@@ -1536,6 +1617,8 @@ TOOLING = [
     tool_artifact_changed,
     tool_content_not_history,
     tool_ratchet,
+    tool_decay_ratchet,
+    tool_anchor_rot,
     tool_monorepo_prefix,
     tool_explore,
 ]

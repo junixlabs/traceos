@@ -19,7 +19,7 @@ assertions:
     about: [flow.implement]
     evidence:
       - { kind: documentation, locator: "skills/README.md#Two things deliberately left out" }
-      - { kind: documentation, locator: "docs/semantic-specification.md#16. Non-goals" }
+      - { kind: documentation, locator: "docs/semantic-specification.md#Non-goals" }
 ---
 
 ## Intent

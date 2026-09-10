@@ -55,12 +55,14 @@ jobs:
         run: python3 tools/check_locators.py examples/traceos-itself
       - name: The Pages site renders
         run: python3 tools/site.py --out /tmp/site --repo .
-      - name: A changed file under tools/ must be modelled
+      - name: A changed file must be modelled, and decay must be discharged
         run: |
           git diff --name-only origin/main...HEAD > /tmp/changed.txt || \
             git diff --name-only HEAD~1 HEAD > /tmp/changed.txt
           python3 tools/traceos.py ratchet examples/traceos-itself \
-            --changed-from /tmp/changed.txt --scope tools/
+            --changed-from /tmp/changed.txt --scope tools/ \
+            --decay-scope tools/ --decay-scope tests/ --decay-scope docs/ \
+            --decay-scope skills/ --decay-baseline 0 --repo .
 
   lint:
     name: Lint and schema

@@ -4,6 +4,7 @@
     init     <repo> [--out DIR] [--name NAME]
     observe  <model_dir> --assertion ID --reference LOC --supports supports|refutes
     identity <model_dir> --id NEW --supersedes OLD --reason TEXT
+    ratchet  <model_dir> --changed-from FILE --scope DIR [--decay-baseline N]
     validate <model_dir> [--repo-files FILE] [--repo PATH]
     resolve  <model_dir> [--context k=v ...] [--json]
     impact   <model_dir> --changed LOCATOR [--changed ...] [--depth N] [--json]
@@ -29,6 +30,7 @@ from engine import (
     Git,
     Model,
     coverage,
+    decay_ratchet,
     graph_diff,
     impact,
     init,
@@ -56,7 +58,7 @@ def read_repo_files(path: str | None) -> list[str] | None:
     if not path:
         return None
     target = pathlib.Path(path)
-    if not target.is_file():
+    if not target.exists():
         raise SystemExit(
             f"{path}: not a file. This flag takes a file listing paths, not a git ref."
         )
@@ -135,6 +137,22 @@ def main() -> int:
         default=[],
         help="only gate changed files under this prefix; repeatable, and it grows",
     )
+    p.add_argument(
+        "--decay-scope",
+        action="append",
+        default=[],
+        help="scope for the decay half; defaults to --scope. The two ratchets "
+        "tighten independently: you can gate decay everywhere the model cites "
+        "before you can gate modelling everywhere",
+    )
+    p.add_argument(
+        "--decay-baseline",
+        type=int,
+        default=None,
+        help="the uncertain count this scope is allowed; a caller's number, never a "
+        "field in the model (INV-001)",
+    )
+    p.add_argument("--repo", default=None)
     p.add_argument("--json", action="store_true")
 
     p = sub.add_parser("explore")
@@ -287,7 +305,11 @@ def main() -> int:
         changed = list(args.changed)
         if args.changed_from:
             changed += read_repo_files(args.changed_from) or []
-        result = ratchet(model, changed, args.scope or None)
+        scope = args.scope or None
+        result = ratchet(model, changed, scope)
+        git = Git(pathlib.Path(args.repo).resolve()) if args.repo else None
+        decay = decay_ratchet(model, changed, now, git, scope, args.decay_baseline)
+        result["decay"] = decay
         if args.json:
             print(json.dumps(result, indent=2))
         else:
@@ -300,7 +322,25 @@ def main() -> int:
                 print(f"  UNMAPPED  {path}")
             if result["out_of_scope"]:
                 print(f"({len(result['out_of_scope'])} changed files outside the scope)")
-        return 1 if result["unmapped"] else 0
+            print(
+                f"{len(decay['uncertain'])} uncertain assertions in scope"
+                + (
+                    f", baseline {decay['baseline']}"
+                    if decay["baseline"] is not None
+                    else ""
+                )
+            )
+            if decay["grew"]:
+                print("  GREW      the uncertain count is above the baseline")
+            for item in decay["undischarged"]:
+                print(
+                    f"  UNDISCHARGED  {item['assertion']} is uncertain and cites "
+                    f"{', '.join(item['references'])}, which this change edits.\n"
+                    f"                Re-observe it, or delete it - an assertion "
+                    f"nobody can verify is abandoned, not stale."
+                )
+        failed = result["unmapped"] or decay["grew"] or decay["undischarged"]
+        return 1 if failed else 0
 
     if args.cmd == "coverage":
         cov = coverage(model, read_repo_files(args.repo_files), now)
