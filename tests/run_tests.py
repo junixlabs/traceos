@@ -69,6 +69,12 @@ def write_fm(path: pathlib.Path, doc: dict) -> None:
     )
 
 
+def stamp(hours: float = 0) -> str:
+    """An explicit instant. Tests that share one timestamp cannot tell "latest
+    observation per reference" from "every observation ever recorded"."""
+    return (NOW + dt.timedelta(hours=hours)).isoformat().replace("+00:00", "Z")
+
+
 def check(group: str, name: str, condition: bool, detail: str = "") -> None:
     RESULTS.append((group, name, bool(condition), detail))
 
@@ -110,7 +116,7 @@ def case_01_bug_fix():
         sb.add_observation(
             assertion="assert.payment.charges-gateway",
             reference="src/payment/PaymentProcessor.ts#process",
-            observed_at=NOW.isoformat().replace("+00:00", "Z"),
+            observed_at=stamp(-2),
             observed_ref="bad0000",
             supports="refutes",
             observer="runtime",
@@ -143,7 +149,7 @@ def case_01_bug_fix():
         sb.add_observation(
             assertion="assert.payment.charges-gateway",
             reference="src/payment/PaymentProcessor.ts#process",
-            observed_at=NOW.isoformat().replace("+00:00", "Z"),
+            observed_at=stamp(-1),
             observed_ref="fix0001",
             supports="supports",
             observer="runtime",
@@ -152,7 +158,7 @@ def case_01_bug_fix():
         sb.add_observation(
             assertion="assert.payment.charges-gateway",
             reference="test/payment/process.spec.ts#charges the gateway",
-            observed_at=NOW.isoformat().replace("+00:00", "Z"),
+            observed_at=stamp(-1),
             observed_ref="fix0001",
             supports="supports",
             observer="ci",
@@ -897,6 +903,30 @@ def inv_evidence_ne_assertion():
 
     sb = Sandbox()
     try:
+        doc = sb.flow("inventory")
+        for a in doc["assertions"]:
+            a["evidence"].append(
+                {"kind": "test", "locator": "test/inventory/reserve.spec.ts#reserves"}
+            )
+        sb.write_flow("inventory", doc)
+        check(
+            "INV Evidence != Assertion",
+            "a reference nobody observed is named, even when the assertion has other evidence",
+            "REFERENCE_NEVER_OBSERVED" in codes(T.validate_evidence(sb.model())),
+        )
+        check(
+            "INV Evidence != Assertion",
+            "and an observation for a dropped reference does not keep confidence up",
+            T.computed_confidence(
+                sb.model(), "assert.inventory.reserves", NOW, T.Git(None)
+            )
+            != "confirmed",
+        )
+    finally:
+        sb.close()
+
+    sb = Sandbox()
+    try:
         doc = sb.flow("purchase")
         doc["assertions"].append(
             {
@@ -1282,6 +1312,127 @@ def tool_explore():
 
 TOOLING = [tool_init, tool_observe, tool_artifact_changed, tool_explore]
 
+
+def inv_confidence_per_reference():
+    """spec 6.3: asked per reference, of its most recent observation only."""
+    aid = "assert.inventory.reserves"
+    ref = "src/inventory/Reserve.ts#reserve"
+
+    def confidence(entries, evidence=None):
+        sb = Sandbox()
+        try:
+            (sb.path / "observations" / "2026-09.jsonl").write_text("")
+            if evidence is not None:
+                doc = sb.flow("inventory")
+                for a in doc["assertions"]:
+                    if a["id"] == aid:
+                        a["evidence"] = evidence
+                sb.write_flow("inventory", doc)
+            for entry in entries:
+                sb.add_observation(assertion=aid, **entry)
+            return T.computed_confidence(sb.model(), aid, NOW, T.Git(None))
+        finally:
+            sb.close()
+
+    older_refutes = confidence(
+        [
+            {
+                "reference": ref,
+                "observed_at": stamp(-3),
+                "observed_ref": "a",
+                "supports": "refutes",
+                "kind": "runtime",
+            },
+            {
+                "reference": ref,
+                "observed_at": stamp(-1),
+                "observed_ref": "b",
+                "supports": "supports",
+                "kind": "implementation",
+            },
+        ]
+    )
+    check(
+        "INV Confidence per reference",
+        "a superseded refutation does not veto a fresher check of the same reference",
+        older_refutes != "uncertain",
+        older_refutes,
+    )
+
+    newer_refutes = confidence(
+        [
+            {
+                "reference": ref,
+                "observed_at": stamp(-3),
+                "observed_ref": "a",
+                "supports": "supports",
+                "kind": "implementation",
+            },
+            {
+                "reference": ref,
+                "observed_at": stamp(-1),
+                "observed_ref": "b",
+                "supports": "refutes",
+                "kind": "runtime",
+            },
+        ]
+    )
+    check(
+        "INV Confidence per reference",
+        "the most recent check is the one that counts",
+        newer_refutes == "uncertain",
+        newer_refutes,
+    )
+
+    dropped = confidence(
+        [
+            {
+                "reference": "src/inventory/Old.ts#reserve",
+                "observed_at": stamp(-1),
+                "observed_ref": "a",
+                "supports": "supports",
+                "kind": "implementation",
+            },
+        ],
+        evidence=[{"kind": "implementation", "locator": ref}],
+    )
+    check(
+        "INV Confidence per reference",
+        "an observation for a reference the assertion dropped counts for nothing",
+        dropped == "uncertain",
+        dropped,
+    )
+
+    weakest = confidence(
+        [
+            {
+                "reference": ref,
+                "observed_at": stamp(-1),
+                "observed_ref": "a",
+                "supports": "supports",
+                "kind": "implementation",
+            },
+            {
+                "reference": "src/inventory/Extra.ts#x",
+                "observed_at": stamp(-24 * 400),
+                "observed_ref": "b",
+                "supports": "supports",
+                "kind": "test",
+            },
+        ],
+        evidence=[
+            {"kind": "implementation", "locator": ref},
+            {"kind": "test", "locator": "src/inventory/Extra.ts#x"},
+        ],
+    )
+    check(
+        "INV Confidence per reference",
+        "an assertion is only as fresh as its stalest reference",
+        weakest == "likely",
+        weakest,
+    )
+
+
 CASES = [
     case_01_bug_fix,
     case_02_refactor,
@@ -1305,6 +1456,7 @@ INVARIANTS = [
     inv_state_ne_lifecycle,
     inv_state_ne_health,
     inv_evidence_ne_assertion,
+    inv_confidence_per_reference,
 ]
 
 

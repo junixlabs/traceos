@@ -44,13 +44,17 @@ python3 ../../tools/traceos.py impact   . --changed "external.stripe"
 python3 ../../tools/traceos.py coverage . --repo-files repo-files.txt
 ```
 
-## The warning and the gaps are deliberate
+## The warnings and the gaps are deliberate
 
-`validate` reports one warning and `integrity: UNCERTAIN`. That is the model working,
-not the model broken.
+`validate` reports three warnings and `integrity: UNCERTAIN`. That is the model
+working, not the model broken.
 
 - `assert.retry.scheduled` has an evidence reference but **no observation**, so its
   confidence is `uncertain` and INV-020 says so out loud.
+- The two gateway assertions each cite `GatewayResolver.ts#resolve` and were only
+  ever observed against `config/flags.yaml`. A reference nobody checked is named
+  individually (`REFERENCE_NEVER_OBSERVED`), because "this assertion has *some*
+  evidence" is not the same as "this address was verified".
 - `src/refund/**` and `src/webhooks/retry.ts` are in `repo-files.txt` and map to no
   node. They appear as coverage gaps, and a change to them lands in the `unknown`
   impact tier rather than being silently reported as no impact.
