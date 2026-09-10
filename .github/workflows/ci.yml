@@ -53,6 +53,8 @@ jobs:
             --repo-files /tmp/repo-files.txt --repo .
       - name: Every evidence locator must point at something that exists
         run: python3 tools/check_locators.py examples/traceos-itself
+      - name: The Pages site renders
+        run: python3 tools/site.py --out /tmp/site --repo .
 
   lint:
     name: Lint and schema

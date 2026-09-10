@@ -11,7 +11,9 @@ knowing that payment participates in purchase, refund, subscription, notificatio
 risk. The dependency graph shows `PaymentService → PaymentRepository → StripeAdapter`
 and says nothing about any of that. TraceOS is the missing layer.
 
-![The TraceOS explorer: effective reality per context, four impact tiers, coverage by name](docs/assets/explorer.gif)
+[![The TraceOS explorer: effective reality per context, four impact tiers, coverage by name](docs/assets/explorer.gif)](https://junixlabs.github.io/traceos/)
+
+**[Open the live models →](https://junixlabs.github.io/traceos/)** — the explorer running against both reference models, regenerated on every push.
 
 ## TraceOS, described in TraceOS
 
@@ -122,6 +124,7 @@ examples/traceos-itself/         TraceOS modelled in TraceOS
 skills/                          three agent skills over a shared reference/
 tools/engine.py                  model, validation, resolution, impact, coverage
 tools/explore.py                 the HTML view
+tools/site.py                    the Pages site, built from the models
 tools/traceos.py                 command line: init, observe, validate, resolve,
                                  impact, diff, coverage, explore
 tests/run_tests.py               13 stress cases, 7 invariants, 4 tooling groups
