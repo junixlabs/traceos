@@ -52,7 +52,17 @@ assertions:
     about: [node.reconcile.integrity]
     evidence:
       - { kind: implementation, locator: "traceos/engine.py#integrity" }
+      - { kind: configuration, locator: "traceos/schema/traceos.schema.json" }
       - { kind: documentation, locator: "skills/reconciling-reality/SKILL.md#Report Integrity" }
+  - id: assert.reconcile.invariants-stay-tripled
+    claim: "an invariant drifting between the specification, the skill digest and the engine is reported"
+    subject: integrity.invariants
+    lifecycle: current
+    about: [node.reconcile.integrity]
+    evidence:
+      - { kind: implementation, locator: "traceos/check_docs.py" }
+      - { kind: configuration, locator: ".github/workflows/ci.yml" }
+      - { kind: documentation, locator: "skills/reference/README.md" }
   - id: assert.reconcile.unverifiable-is-not-verified
     claim: "an observation whose ref is absent from the repository caps confidence and is reported"
     subject: integrity.verification

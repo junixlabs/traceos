@@ -44,6 +44,7 @@ assertions:
     evidence:
       - { kind: implementation, locator: "traceos/engine.py#ratchet" }
       - { kind: implementation, locator: "traceos/cli.py" }
+      - { kind: implementation, locator: "traceos/__init__.py" }
       - { kind: configuration, locator: ".github/workflows/ci.yml" }
   - id: assert.trace.unknown-is-not-safe
     claim: "a locator that maps to nothing lands in unknown, never in silence"
