@@ -205,18 +205,18 @@ def build(
             conf = value["confidence"]
             status = value["status"]
             rows.append(
-                f'<tr><td class="mono">{e(subject)}</td>'
-                f"<td>{e(str(value['value']) if value['value'] else '—')}</td>"
-                f'<td><span class="conf {conf}">{CONF_GLYPH[conf]} {conf}</span></td>'
-                f'<td><span class="pill {"bad" if status != "RESOLVED" else "ok"}">'
-                f"{status}</span></td>"
-                f'<td class="mono dim">{e(", ".join(value["assertions"]))}</td></tr>'
+                f'<li class="fact">'
+                f'<div class="fhead"><span class="mono">{e(subject)}</span>'
+                f'<span class="conf {conf}">{CONF_GLYPH[conf]} {conf}</span></div>'
+                f'<div class="fval">{e(str(value["value"]) if value["value"] else "—")}'
+                f"</div>"
+                f'<div class="mono dim fsrc">{e(", ".join(value["assertions"]))}'
+                + ("" if status == "RESOLVED" else f" · <b>{status}</b>")
+                + "</div></li>"
             )
         reality_blocks.append(
             f'<div class="ctx-pane" data-ctx="{i}"{"" if i == 0 else " hidden"}>'
-            f"<table><thead><tr><th>subject</th><th>resolved value</th>"
-            f"<th>confidence</th><th>status</th><th>from</th></tr></thead>"
-            f"<tbody>{''.join(rows)}</tbody></table></div>"
+            f'<ul class="facts">{"".join(rows)}</ul></div>'
         )
 
     ctx_buttons = "".join(
@@ -257,7 +257,8 @@ def build(
             + "</li>"
             for a in flow.get("assertions") or []
         )
-        flow_cards.append(f"""<section class="card" id="{e(fid)}">
+        flow_cards.append(f"""<section class="card flowpane" id="{e(fid)}"
+  data-flow="{e(fid)}"{"" if not flow_cards else " hidden"}>
   <header>
     <h3>{e(fid)}</h3>
     <div class="tags">
@@ -274,6 +275,21 @@ def build(
     <div><h4>Assertions</h4><ul>{assertions or '<li class="dim">none</li>'}</ul></div>
   </div>
 </section>""")
+
+    tree_items = []
+    for fid, flow in ordered:
+        node_items = "".join(
+            f'<li class="mono">{e(n["id"].rsplit(".", 1)[-1])}'
+            f'<span class="ntype dim"> {e(n["type"])}</span></li>'
+            for n in flow.get("nodes") or []
+        )
+        tree_items.append(
+            f'<li><button class="flowbtn{"" if tree_items else " on"}" '
+            f'data-flow="{e(fid)}">{e(fid)}'
+            f'<span class="count">{len(flow.get("nodes") or [])}</span></button>'
+            f'<ul class="nodes">{node_items}</ul></li>'
+        )
+    flow_tree = f'<ul class="tree">{"".join(tree_items)}</ul>'
 
     finding_rows = "".join(
         f'<tr class="{f.level}"><td><span class="pill {f.level}">{f.level}</span></td>'
@@ -345,7 +361,7 @@ def build(
 * {{ box-sizing:border-box }}
 body {{ margin:0; background:var(--bg); color:var(--ink);
   font:14px/1.55 ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif; }}
-.wrap {{ max-width:1180px; margin:0 auto; padding:28px 22px 80px }}
+.wrap {{ max-width:1460px; margin:0 auto; padding:24px 22px 48px }}
 h1 {{ font-size:24px; margin:0; letter-spacing:-.01em }}
 h2 {{ font-size:17px; margin:40px 0 12px; scroll-margin-top:64px }}
 
@@ -361,14 +377,61 @@ h2 {{ font-size:17px; margin:40px 0 12px; scroll-margin-top:64px }}
   letter-spacing:.06em }}
 .path {{ font-size:11px }}
 
-.jump {{ position:sticky; top:0; z-index:20; display:flex; gap:2px; flex-wrap:wrap;
-  background:var(--bg); border-bottom:1px solid var(--line); margin:0 0 22px;
-  padding:8px 0 }}
-.jump a {{ font-size:12px; color:var(--muted); text-decoration:none; padding:5px 10px;
-  border-radius:5px; cursor:pointer; transition:color .18s, background .18s }}
-.jump a:hover {{ color:var(--ink); background:var(--card) }}
-.jump a:focus-visible, .ctx-btn:focus-visible, select:focus-visible {{
-  outline:2px solid var(--action); outline-offset:2px }}
+.shell {{ display:grid; grid-template-columns:232px minmax(0,1fr) 320px;
+  gap:0; border:1px solid var(--line); border-radius:10px; overflow:hidden;
+  margin-top:18px; background:var(--card) }}
+.rail {{ background:var(--bg); max-height:78vh; overflow-y:auto; padding:14px }}
+.rail.left {{ border-right:1px solid var(--line) }}
+.rail.right {{ border-left:1px solid var(--line); padding-top:0 }}
+.stage {{ max-height:78vh; overflow-y:auto; padding:16px 18px; scroll-behavior:smooth }}
+@media (max-width:960px) {{
+  .shell {{ grid-template-columns:1fr }}
+  .rail, .stage {{ max-height:none }}
+  .rail.left {{ border-right:0; border-bottom:1px solid var(--line) }}
+  .rail.right {{ border-left:0; border-top:1px solid var(--line) }}
+}}
+
+.srlabel {{ position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0) }}
+#q {{ width:100%; font:inherit; font-size:12px; padding:6px 9px; margin-bottom:10px;
+  border:1px solid var(--line); border-radius:6px; background:var(--card);
+  color:var(--ink) }}
+.tree, .tree ul {{ list-style:none; margin:0; padding:0 }}
+.tree > li {{ margin-bottom:2px }}
+.flowbtn {{ display:flex; width:100%; gap:6px; align-items:center;
+  justify-content:space-between; background:none; border:0; color:var(--muted);
+  font:inherit; font-family:ui-monospace,monospace; font-size:12px; text-align:left;
+  padding:6px 8px; border-radius:6px; cursor:pointer;
+  transition:color .18s, background .18s }}
+.flowbtn:hover {{ color:var(--ink); background:var(--card) }}
+.flowbtn.on {{ color:var(--ink); background:var(--card);
+  box-shadow:inset 2px 0 0 var(--action) }}
+.count {{ font-size:10px; color:var(--muted); border:1px solid var(--line);
+  border-radius:99px; padding:0 6px }}
+.tree .nodes {{ display:none; padding:2px 0 6px 14px }}
+.flowbtn.on + .nodes {{ display:block }}
+.tree .nodes li {{ font-size:11px; color:var(--muted); padding:2px 0 }}
+.ntype {{ font-size:10px }}
+
+.tabs {{ display:flex; gap:2px; position:sticky; top:0; background:var(--bg);
+  padding:12px 0 10px; border-bottom:1px solid var(--line); margin-bottom:12px;
+  z-index:5 }}
+.tab {{ font:inherit; font-size:11px; background:none; border:0; color:var(--muted);
+  padding:5px 8px; border-radius:5px; cursor:pointer; display:flex; gap:5px;
+  align-items:center; transition:color .18s, background .18s }}
+.tab:hover {{ color:var(--ink) }}
+.tab.on {{ color:var(--ink); background:var(--card) }}
+.pane h2 {{ margin:0 0 10px; font-size:14px }}
+.pane table {{ font-size:12px }}
+.pane .tiers {{ grid-template-columns:1fr }}
+:focus-visible {{ outline:2px solid var(--action); outline-offset:2px }}
+.facts {{ list-style:none; margin:0; padding:0 }}
+.fact {{ border-bottom:1px solid var(--line); padding:9px 0 }}
+.fact:last-child {{ border-bottom:0 }}
+.fhead {{ display:flex; gap:8px; justify-content:space-between; align-items:baseline }}
+.fhead .mono {{ font-size:11.5px }}
+.fval {{ font-size:12.5px; margin:3px 0 2px }}
+.fsrc {{ font-size:10.5px; word-break:break-all }}
+.rail .legend {{ gap:8px; margin:12px 0 0; font-size:10.5px }}
 
 .conf {{ font-size:11px; white-space:nowrap; font-variant-numeric:tabular-nums }}
 .conf.confirmed {{ color:var(--ok) }} .conf.likely {{ color:var(--warn) }}
@@ -383,6 +446,7 @@ h4 {{ font-size:12px; margin:0 0 6px; text-transform:uppercase;
   background:var(--card); padding:10px 14px; border-radius:6px; margin:16px 0 26px }}
 .card {{ background:var(--card); border:1px solid var(--line); border-radius:9px;
   padding:16px 18px; margin:0 0 16px }}
+.flowpane {{ border:0; padding:0; margin:0 }}
 .card > header {{ display:flex; gap:12px; align-items:center; flex-wrap:wrap;
   margin-bottom:12px }}
 .tags {{ display:flex; gap:6px; flex-wrap:wrap }}
@@ -450,12 +514,21 @@ select {{ font:inherit; padding:6px 10px; border-radius:6px; background:var(--ca
         now:%Y-%m-%d %H:%M} UTC</div>
 </header>
 
-<nav class="jump">
-  <a href="#flows">Flows</a><a href="#reality">Effective reality</a>
-  <a href="#impact">Impact</a><a href="#coverage">Coverage</a>
-  <a href="#validation">Validation</a>
-</nav>
+<div class="shell">
 
+<aside class="rail left">
+  <label class="srlabel" for="q">Filter flows and nodes</label>
+  <input id="q" type="search" placeholder="filter…" autocomplete="off">
+  <nav id="flows" aria-label="Flows">{flow_tree}</nav>
+  <div class="legend">
+    <span style="color:var(--action)">■ action</span>
+    <span style="color:var(--decision)">■ decision</span>
+    <span style="color:var(--event)">■ event</span>
+    <span style="color:var(--interaction)">■ interaction</span>
+  </div>
+</aside>
+
+<main class="stage">
 <div class="banner">
   <b>This page is a view, not a source of truth.</b> Regenerate it; never edit it.
   Effective reality, impact, coverage and integrity below were computed by
@@ -464,47 +537,55 @@ select {{ font:inherit; padding:6px 10px; border-radius:6px; background:var(--ca
   engine.
 </div>
 
-<h2 id="flows">Flows <span class="dim">— authored, the behavior itself</span></h2>
-<div class="legend">
-  <span style="color:var(--action)">■ action</span>
-  <span style="color:var(--decision)">■ decision</span>
-  <span style="color:var(--event)">■ event</span>
-  <span style="color:var(--interaction)">■ interaction</span>
-  <span>→ <code>next</code> (arrows) · other relationships listed under each node</span>
-</div>
 {"".join(flow_cards)}
 <p class="note">Parallel branches are drawn as the absence of a
-<code>next</code> arrow, not as a fork construct (INV-021).</p>
+<code>next</code> arrow, not as a fork construct (INV-021). Arrows are
+<code>next</code>; every other relationship is listed under its node.</p>
+</main>
 
-<h2 id="reality">Effective reality <span class="dim">— derived, per context</span></h2>
-<div class="card">
-<div>{ctx_buttons}</div>
-{"".join(reality_blocks)}
-<p class="note">Only <code>current</code> assertions resolve. A context is part of
-the question: the same model answers differently for different tenants without the
-graph being forked (INV-008, INV-016).</p>
-</div>
+<aside class="rail right">
+  <div class="tabs" role="tablist">
+    <button class="tab on" data-pane="reality" role="tab">Reality</button>
+    <button class="tab" data-pane="impact" role="tab">Impact</button>
+    <button class="tab" data-pane="coverage" role="tab">Coverage</button>
+    <button class="tab" data-pane="validation" role="tab">Checks
+      <span class="count">{len(findings)}</span></button>
+  </div>
 
-<h2 id="impact">Impact <span class="dim">— derived, four tiers</span></h2>
-<div class="card">
-  <select id="loc">{impact_options}</select>
-  <div class="tiers" id="tiers"></div>
-  <p class="note">An unmapped file lands in <code>unknown</code>, never in silence.
-  <code>not mapped</code> does not mean <code>not affected</code> (INV-019).</p>
-</div>
+  <section id="reality" class="pane" role="tabpanel">
+    <h2>Effective reality <span class="dim">— derived</span></h2>
+    <div>{ctx_buttons}</div>
+    {"".join(reality_blocks)}
+    <p class="note">Only <code>current</code> assertions resolve. A context is part
+    of the question: the same model answers differently for different tenants
+    without the graph being forked (INV-008, INV-016).</p>
+  </section>
 
-<h2 id="coverage">Coverage <span class="dim">— derived</span></h2>
-<div class="card">{coverage_html}</div>
+  <section id="impact" class="pane" role="tabpanel" hidden>
+    <h2>Impact <span class="dim">— four tiers</span></h2>
+    <label class="srlabel" for="loc">Changed locator</label>
+    <select id="loc">{impact_options}</select>
+    <div class="tiers" id="tiers"></div>
+    <p class="note">An unmapped file lands in <code>unknown</code>, never in
+    silence. <code>not mapped</code> does not mean <code>not affected</code>
+    (INV-019).</p>
+  </section>
 
-<h2 id="validation">Validation <span class="dim">— {len(findings)} finding(s)</span></h2>
-<div class="card">
-  {
+  <section id="coverage" class="pane" role="tabpanel" hidden>
+    <h2>Coverage <span class="dim">— derived</span></h2>
+    {coverage_html}
+  </section>
+
+  <section id="validation" class="pane" role="tabpanel" hidden>
+    <h2>Validation <span class="dim">— {len(findings)} finding(s)</span></h2>
+    {
         "<table><thead><tr><th></th><th>code</th><th>message</th><th>where</th></tr>"
         "</thead><tbody>" + finding_rows + "</tbody></table>"
         if findings
         else '<p class="dim">no findings</p>'
     }
-</div>
+  </section>
+</aside>
 
 </div>
 <script>
@@ -530,6 +611,32 @@ document.querySelectorAll('.ctx-btn').forEach(b => b.addEventListener('click', (
   document.querySelectorAll('.ctx-pane').forEach(p =>
     p.hidden = p.dataset.ctx !== b.dataset.ctx);
 }}));
+
+// Selection and visibility only. Nothing here recomputes a derived value: every
+// figure on the page arrived already computed by the engine.
+document.querySelectorAll('.flowbtn').forEach(b => b.addEventListener('click', () => {{
+  document.querySelectorAll('.flowbtn').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  document.querySelectorAll('.flowpane').forEach(p =>
+    p.hidden = p.dataset.flow !== b.dataset.flow);
+  document.querySelector('.stage').scrollTop = 0;
+}}));
+
+document.querySelectorAll('.tab').forEach(b => b.addEventListener('click', () => {{
+  document.querySelectorAll('.tab').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  document.querySelectorAll('.pane').forEach(p =>
+    p.hidden = p.id !== b.dataset.pane);
+}}));
+
+const q = document.getElementById('q');
+q.addEventListener('input', () => {{
+  const t = q.value.toLowerCase();
+  document.querySelectorAll('.tree > li').forEach(li => {{
+    const hit = li.textContent.toLowerCase().includes(t);
+    li.hidden = t !== '' && !hit;
+  }});
+}});
 </script></body></html>"""
 
 

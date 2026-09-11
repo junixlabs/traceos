@@ -1381,6 +1381,34 @@ def tool_explore():
 
     check(
         "TOOL explore",
+        "exactly one flow is shown at a time, the rest are in the DOM but hidden",
+        page.count('class="card flowpane"') == len(model.flows)
+        and len(re.findall(r'data-flow="[^"]+" hidden>', page)) == len(model.flows) - 1,
+        "{} panes".format(page.count('class="card flowpane"')),
+    )
+    check(
+        "TOOL explore",
+        "the left rail lists every flow as a selectable button",
+        all(f'data-flow="{f}"' in page for f in model.flows)
+        and page.count("flowbtn") >= len(model.flows),
+    )
+    check(
+        "TOOL explore",
+        "the right rail carries four panes and opens on exactly one",
+        page.count('class="pane" role="tabpanel">') == 1
+        and page.count('class="pane" role="tabpanel" hidden>') == 3,
+        "{} open, {} hidden".format(
+            page.count('class="pane" role="tabpanel">'),
+            page.count('class="pane" role="tabpanel" hidden>'),
+        ),
+    )
+    check(
+        "TOOL explore",
+        "resolved facts are stacked, not a five-column table crushed into a rail",
+        '<ul class="facts">' in page and "<th>resolved value</th>" not in page,
+    )
+    check(
+        "TOOL explore",
         "the diagrams lead: flows come before the derived tables",
         page.index('id="flows"') < page.index('id="reality"') < page.index('id="impact"'),
     )
