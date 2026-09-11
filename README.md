@@ -155,7 +155,7 @@ traceos/explore.py               the HTML view
 traceos/site.py                  the Pages site, built from the models
 traceos/cli.py                   command line: init, observe, validate, resolve,
                                  impact, diff, coverage, explore
-tests/run_tests.py               13 stress cases, 9 invariants, 16 tooling groups
+tests/run_tests.py               13 stress cases, 12 invariants, 16 tooling groups
 ```
 
 ## Status
