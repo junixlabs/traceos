@@ -18,8 +18,10 @@ relationships:
   - { type: emits, source: node.purchase.confirm, target: event.order.created }
   - { type: transitions_to, source: node.purchase.confirm, target: state.order.confirmed }
   - { type: transitions_to, source: node.purchase.reject,  target: state.order.rejected }
+realizes:
+  - intent.a-confirmed-order-is-a-promise
 outcomes:
-  - { id: purchase.confirmed, states: [{ subject: order, value: confirmed }] }
+  - { id: purchase.confirmed, states: [{ subject: order, value: confirmed }], verified_by: assert.purchase.confirms-order }
   - { id: purchase.rejected,  states: [{ subject: order, value: rejected }] }
 assertions:
   - id: assert.purchase.confirms-order

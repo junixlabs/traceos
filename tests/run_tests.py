@@ -2230,6 +2230,186 @@ CASES = [
     case_12_human_decision,
     case_13_scheduled,
 ]
+
+
+def inv_outcome_can_be_refuted():
+    """INV-027 / INV-028. The only place reality can contradict the model.
+
+    Intent and Behavior are both statements; two statements disagree only about words.
+    An Outcome can be measured, so a `refutes` against its check is the first
+    machine-produced evidence that a claim is *wrong* rather than merely *stale* - the
+    distinction nothing else in this system can make.
+    """
+    base = {
+        "id": "flow.pay",
+        "type": "flow",
+        "domain": "pay",
+        "lifecycle": "current",
+        "coverage_declared": "stub",
+        "trigger": {"kind": "user_action", "actor": "external.buyer"},
+        "realizes": ["intent.money-moves-once"],
+        "nodes": [{"id": "node.pay.charge", "type": "action", "name": "Charge"}],
+        "relationships": [
+            {
+                "type": "transitions_to",
+                "source": "node.pay.charge",
+                "target": "state.order.paid",
+            }
+        ],
+        "outcomes": [
+            {
+                "id": "pay.settled",
+                "states": [{"subject": "order", "value": "paid"}],
+                "verified_by": "assert.pay.settles",
+            }
+        ],
+        "assertions": [
+            {
+                "id": "assert.pay.settles",
+                "claim": "a charge that returns ok leaves the order paid",
+                "subject": "pay.settlement",
+                "lifecycle": "current",
+                "about": ["node.pay.charge"],
+                "evidence": [
+                    {"kind": "runtime", "locator": "ops/slo/settlement.yaml#paid_rate"}
+                ],
+            }
+        ],
+    }
+    intents = {
+        "id": "system.x.intents",
+        "type": "intents",
+        "intents": [
+            {
+                "id": "intent.money-moves-once",
+                "statement": "a buyer is charged once per order",
+                "record": {
+                    "kind": "decision",
+                    "locator": "docs/decisions/007-context-as-selector.md#Decision",
+                },
+            }
+        ],
+    }
+    externals = {
+        "id": "system.x.externals",
+        "type": "externals",
+        "externals": [{"id": "external.buyer", "name": "Buyer"}],
+    }
+
+    clean = scratch_model({"pay": base, "intents": intents, "ext": externals})
+    got = codes(T.validate(clean, None, {}, NOW))
+    check(
+        "INV-027 outcome refuted",
+        "a declared check with no observation reports, it does not fail",
+        "OUTCOME_NEVER_CHECKED" in got and "OUTCOME_REFUTED" not in got,
+        str(sorted(got)),
+    )
+    check(
+        "INV-027 outcome refuted",
+        "an Intent citing a frozen record raises nothing",
+        "INTENT_WITHOUT_RECORD" not in got and "INTENT_UNKNOWN" not in got,
+        str(sorted(got)),
+    )
+
+    refuted = scratch_model({"pay": base, "intents": intents, "ext": externals})
+    refuted.observations.append(
+        {
+            "assertion": "assert.pay.settles",
+            "reference": "ops/slo/settlement.yaml#paid_rate",
+            "observed_at": stamp(1),
+            "supports": "refutes",
+            "observer": "runtime",
+            "kind": "runtime",
+        }
+    )
+    findings = T.validate(refuted, None, {}, NOW)
+    got = codes(findings)
+    check(
+        "INV-027 outcome refuted",
+        "an outcome refuted by its own check is an error, not a warning",
+        "OUTCOME_REFUTED" in got
+        and any(f.code == "OUTCOME_REFUTED" and f.level == "error" for f in findings),
+        str(sorted(got)),
+    )
+    check(
+        "INV-027 outcome refuted",
+        "integrity goes INVALID: the model is wrong, not merely stale",
+        T.integrity(findings, {}, None) == "INVALID",
+        T.integrity(findings, {}, None),
+    )
+
+    # Positive control. A later supporting observation must lift it, or the check is
+    # answering "there exists a refutes" rather than "the latest observation refutes".
+    refuted.observations.append(
+        {
+            "assertion": "assert.pay.settles",
+            "reference": "ops/slo/settlement.yaml#paid_rate",
+            "observed_at": stamp(2),
+            "supports": "supports",
+            "observer": "runtime",
+            "kind": "runtime",
+        }
+    )
+    check(
+        "INV-027 outcome refuted",
+        "a later supporting observation clears it",
+        "OUTCOME_REFUTED" not in codes(T.validate(refuted, None, {}, NOW)),
+    )
+
+    unknown = {**base, "realizes": ["intent.nobody-declared-this"]}
+    got = codes(
+        T.validate(
+            scratch_model({"pay": unknown, "intents": intents, "ext": externals}),
+            None,
+            {},
+            NOW,
+        )
+    )
+    check(
+        "INV-027 outcome refuted",
+        "realizing an undeclared Intent is an error",
+        "INTENT_UNKNOWN" in got,
+        str(sorted(got)),
+    )
+
+    no_intent = {k: v for k, v in base.items() if k != "realizes"}
+    findings = T.validate(
+        scratch_model({"pay": no_intent, "intents": intents, "ext": externals}),
+        None,
+        {},
+        NOW,
+    )
+    check(
+        "INV-028 intent is provenance",
+        "a Flow with no Intent is reported at info and never gates",
+        any(f.code == "FLOW_WITHOUT_INTENT" and f.level == "info" for f in findings)
+        and not [f for f in findings if f.level == "error"],
+        str(sorted(codes(findings))),
+    )
+
+    opinion = {
+        "id": "system.x.intents",
+        "type": "intents",
+        "intents": [
+            {"id": "intent.money-moves-once", "statement": "because", "record": {}}
+        ],
+    }
+    got = codes(
+        T.validate(
+            scratch_model({"pay": base, "intents": opinion, "ext": externals}),
+            None,
+            {},
+            NOW,
+        )
+    )
+    check(
+        "INV-028 intent is provenance",
+        "an Intent with no record is an opinion, and is rejected",
+        "INTENT_WITHOUT_RECORD" in got,
+        str(sorted(got)),
+    )
+
+
 INVARIANTS = [
     inv_reality_ne_code,
     inv_code_change_ne_behavior_change,
@@ -2239,6 +2419,7 @@ INVARIANTS = [
     inv_state_ne_health,
     inv_evidence_ne_assertion,
     inv_confidence_per_reference,
+    inv_outcome_can_be_refuted,
 ]
 
 

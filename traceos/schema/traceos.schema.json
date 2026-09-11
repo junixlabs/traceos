@@ -3,70 +3,137 @@
   "$id": "https://traceos.dev/schema/v0.1/traceos.schema.json",
   "title": "TraceOS v0.1 model document",
   "description": "Validates the YAML frontmatter of a TraceOS model document. Structure only - semantics are defined by docs/semantic-specification.md. Rules that this schema cannot express (relationship matrix, next-same-flow, contradiction, confidence<=computed, coverage declared vs measured) are enforced by the validator.",
-
   "$defs": {
     "id": {
       "type": "string",
-      "pattern": "^(system|domain|flow|node|state|event|external|assert)\\.[a-z0-9-]+(\\.[a-z0-9-]+)*$"
+      "pattern": "^(system|domain|flow|node|state|event|external|assert|intent)\\.[a-z0-9-]+(\\.[a-z0-9-]+)*$"
     },
-    "lifecycle": { "enum": ["current", "proposed", "planned", "deprecated"] },
-    "confidence": { "enum": ["uncertain", "likely", "confirmed"] },
+    "lifecycle": {
+      "enum": [
+        "current",
+        "proposed",
+        "planned",
+        "deprecated"
+      ]
+    },
+    "confidence": {
+      "enum": [
+        "uncertain",
+        "likely",
+        "confirmed"
+      ]
+    },
     "contextSelector": {
       "type": "object",
       "description": "INV-008: selects applicability. Empty or absent matches every context.",
-      "additionalProperties": { "type": ["string", "number", "boolean"] }
+      "additionalProperties": {
+        "type": [
+          "string",
+          "number",
+          "boolean"
+        ]
+      }
     },
     "supersedes": {
       "type": "array",
       "description": "INV-014: identity history metadata. Never traversed, never a relationship.",
-      "items": { "$ref": "#/$defs/id" }
+      "items": {
+        "$ref": "#/$defs/id"
+      }
     },
     "stateRef": {
       "type": "object",
-      "required": ["subject", "value"],
+      "required": [
+        "subject",
+        "value"
+      ],
       "additionalProperties": false,
       "properties": {
-        "subject": { "type": "string" },
-        "value": { "type": ["string", "number", "boolean"] }
+        "subject": {
+          "type": "string"
+        },
+        "value": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ]
+        }
       }
     },
     "evidenceReference": {
       "type": "object",
       "description": "AUTHORED half of Evidence. The observation half is RECORDED, in observations/*.jsonl.",
-      "required": ["kind", "locator"],
+      "required": [
+        "kind",
+        "locator"
+      ],
       "additionalProperties": false,
       "properties": {
         "kind": {
-          "enum": ["implementation", "test", "runtime", "configuration", "external_contract", "documentation"]
+          "enum": [
+            "implementation",
+            "test",
+            "runtime",
+            "configuration",
+            "external_contract",
+            "documentation",
+            "decision"
+          ]
         },
         "locator": {
           "type": "string",
           "minLength": 1,
           "description": "INV-022: symbol path, never a line number.",
-          "not": { "pattern": ":[0-9]+$" }
+          "not": {
+            "pattern": ":[0-9]+$"
+          }
         },
-        "note": { "type": "string" }
+        "note": {
+          "type": "string"
+        }
       }
     },
     "assertion": {
       "type": "object",
-      "required": ["id", "claim", "subject", "lifecycle"],
+      "required": [
+        "id",
+        "claim",
+        "subject",
+        "lifecycle"
+      ],
       "additionalProperties": false,
       "properties": {
-        "id": { "$ref": "#/$defs/id" },
-        "claim": { "type": "string", "minLength": 1 },
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "claim": {
+          "type": "string",
+          "minLength": 1
+        },
         "subject": {
           "type": "string",
           "description": "Contradiction is detected per subject with overlapping selectors."
         },
-        "when": { "$ref": "#/$defs/contextSelector" },
-        "lifecycle": { "$ref": "#/$defs/lifecycle" },
+        "when": {
+          "$ref": "#/$defs/contextSelector"
+        },
+        "lifecycle": {
+          "$ref": "#/$defs/lifecycle"
+        },
         "about": {
           "type": "array",
           "description": "Entities this assertion is about. Drives the reverse index locator -> assertion -> node (spec 11.1).",
-          "items": { "$ref": "#/$defs/id" }
+          "items": {
+            "$ref": "#/$defs/id"
+          }
         },
-        "evidence": { "type": "array", "items": { "$ref": "#/$defs/evidenceReference" } },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/evidenceReference"
+          }
+        },
         "confidence_asserted": {
           "$ref": "#/$defs/confidence",
           "description": "INV-009: optional human override. Validator checks asserted <= computed."
@@ -79,99 +146,314 @@
     },
     "node": {
       "type": "object",
-      "required": ["id", "type", "name"],
+      "required": [
+        "id",
+        "type",
+        "name"
+      ],
       "additionalProperties": false,
       "properties": {
-        "id": { "$ref": "#/$defs/id" },
+        "id": {
+          "$ref": "#/$defs/id"
+        },
         "type": {
-          "enum": ["action", "decision", "event", "interaction"],
+          "enum": [
+            "action",
+            "decision",
+            "event",
+            "interaction"
+          ],
           "description": "INV-003: there is no 'state' node type."
         },
-        "name": { "type": "string", "minLength": 1 },
-        "supersedes": { "$ref": "#/$defs/supersedes" }
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "supersedes": {
+          "$ref": "#/$defs/supersedes"
+        }
       }
     },
     "relationship": {
       "type": "object",
-      "required": ["type", "source", "target"],
+      "required": [
+        "type",
+        "source",
+        "target"
+      ],
       "additionalProperties": false,
       "properties": {
         "type": {
-          "enum": ["next", "triggers", "invokes", "emits", "depends_on", "interacts_with", "transitions_to"],
+          "enum": [
+            "next",
+            "triggers",
+            "invokes",
+            "emits",
+            "depends_on",
+            "interacts_with",
+            "transitions_to"
+          ],
           "description": "INV-006: endpoint pairs are checked by the validator against the matrix."
         },
-        "source": { "$ref": "#/$defs/id" },
-        "target": { "$ref": "#/$defs/id" },
+        "source": {
+          "$ref": "#/$defs/id"
+        },
+        "target": {
+          "$ref": "#/$defs/id"
+        },
         "condition": {
           "type": "string",
           "description": "INV-007: only meaningful on 'next'. Enforced by the validator."
         },
-        "when": { "$ref": "#/$defs/contextSelector" }
+        "when": {
+          "$ref": "#/$defs/contextSelector"
+        }
       }
     },
     "outcome": {
       "type": "object",
-      "description": "INV-015: declared by the Flow, bound to States. Never inferred from topology.",
-      "required": ["id", "states"],
+      "description": "INV-015: declared by the Flow, bound to States. Never inferred from topology. INV-027: it also declares the Assertion that checks whether it occurred, or says in the open that it declares none.",
+      "required": [
+        "id",
+        "states"
+      ],
       "additionalProperties": false,
       "properties": {
-        "id": { "type": "string", "minLength": 1 },
-        "states": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/stateRef" } }
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "states": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/stateRef"
+          }
+        },
+        "verified_by": {
+          "$ref": "#/$defs/id"
+        }
       }
     },
     "trigger": {
       "type": "object",
       "description": "INV-004: a Flow property, not an entity.",
-      "required": ["kind"],
+      "required": [
+        "kind"
+      ],
       "additionalProperties": false,
       "properties": {
-        "kind": { "enum": ["event", "schedule", "state_change", "user_action", "external_event"] },
-        "ref": { "$ref": "#/$defs/id" },
+        "kind": {
+          "enum": [
+            "event",
+            "schedule",
+            "state_change",
+            "user_action",
+            "external_event"
+          ]
+        },
+        "ref": {
+          "$ref": "#/$defs/id"
+        },
         "semantic": {
           "type": "string",
           "description": "For kind=schedule. Semantic only - never a cron expression."
         },
-        "actor": { "$ref": "#/$defs/id" }
+        "actor": {
+          "$ref": "#/$defs/id"
+        }
       },
       "allOf": [
-        { "if": { "properties": { "kind": { "const": "event" } }, "required": ["kind"] },
-          "then": { "required": ["ref"] } },
-        { "if": { "properties": { "kind": { "const": "external_event" } }, "required": ["kind"] },
-          "then": { "required": ["ref"] } },
-        { "if": { "properties": { "kind": { "const": "state_change" } }, "required": ["kind"] },
-          "then": { "required": ["ref"] } },
-        { "if": { "properties": { "kind": { "const": "schedule" } }, "required": ["kind"] },
-          "then": { "required": ["semantic"] } },
-        { "if": { "properties": { "kind": { "const": "user_action" } }, "required": ["kind"] },
-          "then": { "required": ["actor"] } }
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "event"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "required": [
+              "ref"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "external_event"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "required": [
+              "ref"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "state_change"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "required": [
+              "ref"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "schedule"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "required": [
+              "semantic"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "user_action"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "required": [
+              "actor"
+            ]
+          }
+        }
       ]
+    },
+    "intent": {
+      "type": "object",
+      "description": "INV-028: why a behavior was asked for. Verified by provenance - is this the record that asked for it, has it been superseded - never by truth, which no mechanism can establish.",
+      "required": [
+        "id",
+        "statement",
+        "record"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "statement": {
+          "type": "string",
+          "minLength": 1
+        },
+        "record": {
+          "$ref": "#/$defs/evidenceReference"
+        },
+        "lifecycle": {
+          "$ref": "#/$defs/lifecycle"
+        },
+        "supersedes": {
+          "$ref": "#/$defs/supersedes"
+        }
+      }
     }
   },
-
   "type": "object",
-  "required": ["id", "type"],
+  "required": [
+    "id",
+    "type"
+  ],
   "properties": {
-    "id": { "$ref": "#/$defs/id" },
-    "type": { "enum": ["system", "flow", "externals", "events", "contexts"] },
-
-    "integrity":        { "not": {}, "description": "INV-001: DERIVED, never authored." },
-    "impact":           { "not": {}, "description": "INV-001: DERIVED, never authored." },
-    "effective_reality":{ "not": {}, "description": "INV-002: DERIVED, never authored." },
-    "coverage_measured":{ "not": {}, "description": "INV-001: DERIVED, never authored." },
-    "health":           { "not": {}, "description": "INV-018: out of scope in v0.1." }
+    "id": {
+      "$ref": "#/$defs/id"
+    },
+    "type": {
+      "enum": [
+        "system",
+        "flow",
+        "externals",
+        "events",
+        "contexts",
+        "intents"
+      ]
+    },
+    "integrity": {
+      "not": {},
+      "description": "INV-001: DERIVED, never authored."
+    },
+    "impact": {
+      "not": {},
+      "description": "INV-001: DERIVED, never authored."
+    },
+    "effective_reality": {
+      "not": {},
+      "description": "INV-002: DERIVED, never authored."
+    },
+    "coverage_measured": {
+      "not": {},
+      "description": "INV-001: DERIVED, never authored."
+    },
+    "health": {
+      "not": {},
+      "description": "INV-018: out of scope in v0.1."
+    }
   },
-
   "allOf": [
     {
-      "if": { "properties": { "type": { "const": "system" } }, "required": ["type"] },
+      "if": {
+        "properties": {
+          "type": {
+            "const": "system"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
       "then": {
-        "required": ["name"],
+        "required": [
+          "name"
+        ],
         "additionalProperties": false,
         "properties": {
-          "id": true, "type": true,
-          "name": { "type": "string" },
-          "domains": { "type": "array", "items": { "type": "string" } },
-          "staleness_window_days": { "type": "integer", "minimum": 1, "default": 90 },
+          "id": true,
+          "type": true,
+          "name": {
+            "type": "string"
+          },
+          "domains": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "staleness_window_days": {
+            "type": "integer",
+            "minimum": 1,
+            "default": 90
+          },
           "repo_prefix": {
             "type": "string",
             "description": "Where this model's locators sit relative to the repository root, e.g. \"packages/api\" in a monorepo. Without it every path a diff produces misses, and a miss is invisible."
@@ -180,41 +462,118 @@
       }
     },
     {
-      "if": { "properties": { "type": { "const": "flow" } }, "required": ["type"] },
+      "if": {
+        "properties": {
+          "type": {
+            "const": "flow"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
       "then": {
-        "required": ["domain", "lifecycle", "trigger", "coverage_declared"],
+        "required": [
+          "domain",
+          "lifecycle",
+          "trigger",
+          "coverage_declared"
+        ],
         "additionalProperties": false,
         "properties": {
-          "id": true, "type": true,
-          "domain": { "type": "string" },
-          "lifecycle": { "$ref": "#/$defs/lifecycle" },
-          "coverage_declared": { "enum": ["complete", "partial", "stub"] },
-          "trigger": { "$ref": "#/$defs/trigger" },
-          "supersedes": { "$ref": "#/$defs/supersedes" },
-          "nodes": { "type": "array", "items": { "$ref": "#/$defs/node" } },
-          "relationships": { "type": "array", "items": { "$ref": "#/$defs/relationship" } },
-          "outcomes": { "type": "array", "items": { "$ref": "#/$defs/outcome" } },
-          "assertions": { "type": "array", "items": { "$ref": "#/$defs/assertion" } }
+          "id": true,
+          "type": true,
+          "domain": {
+            "type": "string"
+          },
+          "lifecycle": {
+            "$ref": "#/$defs/lifecycle"
+          },
+          "coverage_declared": {
+            "enum": [
+              "complete",
+              "partial",
+              "stub"
+            ]
+          },
+          "trigger": {
+            "$ref": "#/$defs/trigger"
+          },
+          "supersedes": {
+            "$ref": "#/$defs/supersedes"
+          },
+          "nodes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/node"
+            }
+          },
+          "relationships": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/relationship"
+            }
+          },
+          "outcomes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/outcome"
+            }
+          },
+          "assertions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/assertion"
+            }
+          },
+          "realizes": {
+            "type": "array",
+            "description": "INV-028: the Intents this Flow exists to serve.",
+            "items": {
+              "$ref": "#/$defs/id"
+            }
+          }
         }
       }
     },
     {
-      "if": { "properties": { "type": { "const": "externals" } }, "required": ["type"] },
+      "if": {
+        "properties": {
+          "type": {
+            "const": "externals"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
       "then": {
-        "required": ["externals"],
+        "required": [
+          "externals"
+        ],
         "additionalProperties": false,
         "properties": {
-          "id": true, "type": true,
+          "id": true,
+          "type": true,
           "externals": {
             "type": "array",
             "items": {
               "type": "object",
-              "required": ["id", "name"],
+              "required": [
+                "id",
+                "name"
+              ],
               "additionalProperties": false,
               "properties": {
-                "id": { "$ref": "#/$defs/id" },
-                "name": { "type": "string" },
-                "note": { "type": "string" }
+                "id": {
+                  "$ref": "#/$defs/id"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "note": {
+                  "type": "string"
+                }
               }
             }
           }
@@ -222,22 +581,46 @@
       }
     },
     {
-      "if": { "properties": { "type": { "const": "events" } }, "required": ["type"] },
+      "if": {
+        "properties": {
+          "type": {
+            "const": "events"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
       "then": {
-        "required": ["events"],
+        "required": [
+          "events"
+        ],
         "additionalProperties": false,
         "properties": {
-          "id": true, "type": true,
+          "id": true,
+          "type": true,
           "events": {
             "type": "array",
             "items": {
               "type": "object",
-              "required": ["id", "name"],
+              "required": [
+                "id",
+                "name"
+              ],
               "additionalProperties": false,
               "properties": {
-                "id": { "$ref": "#/$defs/id" },
-                "name": { "type": "string" },
-                "relationships": { "type": "array", "items": { "$ref": "#/$defs/relationship" } }
+                "id": {
+                  "$ref": "#/$defs/id"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "relationships": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/$defs/relationship"
+                  }
+                }
               }
             }
           }
@@ -245,22 +628,74 @@
       }
     },
     {
-      "if": { "properties": { "type": { "const": "contexts" } }, "required": ["type"] },
+      "if": {
+        "properties": {
+          "type": {
+            "const": "intents"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
       "then": {
-        "required": ["dimensions"],
         "additionalProperties": false,
         "properties": {
-          "id": true, "type": true,
+          "id": true,
+          "type": true,
+          "intents": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/intent"
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "contexts"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "then": {
+        "required": [
+          "dimensions"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": true,
+          "type": true,
           "dimensions": {
             "type": "array",
             "items": {
               "type": "object",
-              "required": ["name"],
+              "required": [
+                "name"
+              ],
               "additionalProperties": false,
               "properties": {
-                "name": { "type": "string" },
-                "values": { "type": "array", "items": { "type": ["string", "number", "boolean"] } },
-                "note": { "type": "string" }
+                "name": {
+                  "type": "string"
+                },
+                "values": {
+                  "type": "array",
+                  "items": {
+                    "type": [
+                      "string",
+                      "number",
+                      "boolean"
+                    ]
+                  }
+                },
+                "note": {
+                  "type": "string"
+                }
               }
             }
           }

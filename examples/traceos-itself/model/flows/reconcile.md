@@ -24,8 +24,11 @@ relationships:
   - { type: interacts_with, source: node.reconcile.integrity, target: external.reader }
   - { type: transitions_to, source: node.reconcile.integrity, target: state.integrity.reported }
   - { type: depends_on, source: flow.reconcile, target: external.repository }
+realizes:
+  - intent.confidence-must-be-able-to-fall
+  - intent.derived-is-never-authored
 outcomes:
-  - { id: reconcile.reported, states: [{ subject: integrity, value: reported }] }
+  - { id: reconcile.reported, states: [{ subject: integrity, value: reported }], verified_by: assert.reconcile.integrity-is-computed }
 assertions:
   - id: assert.reconcile.confidence-decays
     claim: "confidence falls when an artifact moves under an observation, with no model file edited"

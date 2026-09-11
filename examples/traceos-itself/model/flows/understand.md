@@ -18,8 +18,10 @@ relationships:
   - { type: next, source: node.understand.observe,   target: node.understand.assert }
   - { type: interacts_with, source: node.understand.observe, target: external.repository }
   - { type: transitions_to, source: node.understand.assert, target: state.model.established }
+realizes:
+  - intent.reference-is-an-address
 outcomes:
-  - { id: understand.modeled, states: [{ subject: model, value: established }] }
+  - { id: understand.modeled, states: [{ subject: model, value: established }], verified_by: assert.understand.observes-before-asserting }
 assertions:
   - id: assert.understand.observes-before-asserting
     claim: "an evidence reference is authored, then checked, and only the check is recorded"

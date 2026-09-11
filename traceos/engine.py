@@ -102,6 +102,7 @@ class Model:
         self.nodes: dict[str, dict] = {}
         self.node_flow: dict[str, str] = {}
         self.events: dict[str, dict] = {}
+        self.intents: dict[str, dict] = {}
         self.externals: dict[str, dict] = {}
         self.states: set[str] = set()
         self.dimensions: dict[str, dict] = {}
@@ -161,6 +162,9 @@ class Model:
         dtype = doc.get("type")
         if dtype == "system":
             self.system = doc
+        elif dtype == "intents":
+            for intent in doc.get("intents") or []:
+                self.intents[intent["id"]] = {**intent, "_where": where}
         elif dtype == "flow":
             fid = doc.get("id", where)
             self.flows[fid] = doc
@@ -694,6 +698,155 @@ def validate_observation_refs(model: Model, git: Git | None) -> list[Finding]:
                 "observations/",
             )
         )
+
+
+def latest_observation(model: Model, assertion_id: str, reference: str | None = None):
+    """The most recent observation for an assertion, optionally for one reference."""
+    best = None
+    for observation in model.observations:
+        if observation.get("assertion") != assertion_id:
+            continue
+        if reference is not None and observation.get("reference") != reference:
+            continue
+        if best is None or observation["observed_at"] >= best["observed_at"]:
+            best = observation
+    return best
+
+
+def validate_intents(model: Model) -> list[Finding]:
+    """INV-028. Intent is verified by provenance, never by truth.
+
+    Nothing can establish that a sentence is really why a behavior was asked for, so
+    the only checkable question is whether it names the frozen record that asked
+    (6.2.1) and whether that record still resolves. A model that verified intent by
+    reading the code would be circular: the code is what the intent is supposed to
+    explain.
+
+    The community already writes those records - ADRs in `docs/decisions/`, closed
+    issues, commit trailers - and tooling exists to author and supersede them. TraceOS
+    does not add a format. It cites one, and notices when the citation stops
+    resolving.
+    """
+    findings = []
+    for iid, intent in sorted(model.intents.items()):
+        where = intent.get("_where", iid)
+        record = intent.get("record") or {}
+        if not record.get("locator"):
+            findings.append(
+                Finding(
+                    "error",
+                    "INTENT_WITHOUT_RECORD",
+                    f"{iid}: an Intent must cite the record that asked for it "
+                    f"(INV-028); a statement with no record is an opinion",
+                    where,
+                )
+            )
+        elif record.get("kind") != "decision":
+            findings.append(
+                Finding(
+                    "warn",
+                    "INTENT_RECORD_NOT_A_DECISION",
+                    f"{iid}: record kind is '{record.get('kind')}'. A frozen "
+                    f"decision is the only evidence that cannot go stale under "
+                    f"its own subject (6.2.1)",
+                    where,
+                )
+            )
+
+    declared = set(model.intents)
+    for fid, flow in model.flows.items():
+        where = flow.get("id", fid)
+        realizes = flow.get("realizes") or []
+        for iid in realizes:
+            if iid not in declared:
+                findings.append(
+                    Finding(
+                        "error",
+                        "INTENT_UNKNOWN",
+                        f"{fid} realizes {iid}, which is not declared",
+                        where,
+                    )
+                )
+        if not realizes and flow.get("lifecycle") == "current":
+            findings.append(
+                Finding(
+                    "info",
+                    "FLOW_WITHOUT_INTENT",
+                    f"{fid}: no Intent declares why this Flow exists. Reported, "
+                    f"never gated - most behavior predates anyone writing the "
+                    f"decision down",
+                    where,
+                )
+            )
+    return findings
+
+
+def validate_outcome_verification(model: Model) -> list[Finding]:
+    """INV-027. An Outcome declares the Assertion that checks it, or says it has none.
+
+    This is the only place in the model where reality can contradict it. Intent and
+    Behavior are both statements, and two statements can disagree only about words; an
+    Outcome can be measured, so a `refutes` against one is the first machine-produced
+    evidence that a claim is *wrong* rather than merely *stale* (6.4).
+
+    An outcome that declares no check is reported, not failed. Silence is the thing
+    forbidden: an unverifiable outcome and a verified one must not read the same
+    (INV-025).
+    """
+    findings = []
+    for fid, flow in model.flows.items():
+        where = flow.get("id", fid)
+        for outcome in flow.get("outcomes") or []:
+            oid = outcome.get("id", "?")
+            verified_by = outcome.get("verified_by")
+            if not verified_by:
+                findings.append(
+                    Finding(
+                        "warn",
+                        "OUTCOME_NOT_VERIFIABLE",
+                        f"{fid}: outcome '{oid}' declares no Assertion that "
+                        f"checks whether it occurred (INV-027)",
+                        where,
+                    )
+                )
+                continue
+            assertion = model.assertions.get(verified_by)
+            if assertion is None:
+                findings.append(
+                    Finding(
+                        "error",
+                        "OUTCOME_CHECK_UNKNOWN",
+                        f"{fid}: outcome '{oid}' is verified_by {verified_by}, "
+                        f"which is not an Assertion in this model",
+                        where,
+                    )
+                )
+                continue
+            observation = latest_observation(model, verified_by)
+            if observation is None:
+                findings.append(
+                    Finding(
+                        "warn",
+                        "OUTCOME_NEVER_CHECKED",
+                        f"{fid}: outcome '{oid}' names a check ({verified_by}) "
+                        f"that has never been observed",
+                        where,
+                    )
+                )
+                continue
+            if observation.get("supports") == "refutes":
+                findings.append(
+                    Finding(
+                        "error",
+                        "OUTCOME_REFUTED",
+                        f"{fid}: outcome '{oid}' is refuted by its own check - "
+                        f"{verified_by} was observed {observation.get('observed_at')} "
+                        f"by {observation.get('observer', 'unknown')} and did not "
+                        f"hold. The model says this outcome occurs; evidence says "
+                        f"it did not (INV-027)",
+                        where,
+                    )
+                )
     return findings
 
 
@@ -1154,6 +1307,8 @@ def validate(
     findings += validate_relationships(model)
     findings += validate_outcomes(model)
     findings += validate_observation_refs(model, git)
+    findings += validate_intents(model)
+    findings += validate_outcome_verification(model)
     findings += validate_identity(model)
     findings += validate_evidence(model)
     findings += validate_confidence(model, at_time, git)
@@ -1806,6 +1961,36 @@ itself - and a wrong suggestion at step one is worse than no suggestion.
     )
 
     write(
+        "model/intents.md",
+        f"""---
+id: system.{slug}.intents
+type: intents
+intents: []
+---
+
+## What belongs here
+
+An Intent says **why** a behavior was asked for, and cites the frozen record that asked
+for it - an ADR, a closed issue, a decision minute (spec 6.2.1):
+
+```yaml
+intents:
+  - id: intent.money-moves-once
+    statement: a buyer is charged once per order
+    record: {{ kind: decision, locator: "docs/decisions/0007-idempotent-charges.md#Decision" }}
+```
+
+Intent is verified by **provenance, never by truth** (INV-028): whether the record still
+resolves, and whether it has been superseded. Whether the sentence is really the reason
+is not answerable by any mechanism.
+
+Leave this empty until a record exists. A Flow with no Intent is reported and never
+gated, because most behavior predates anyone writing the decision down - and an invented
+Intent is worse than none.
+""",
+    )
+
+    write(
         "model/events.md",
         f"""---
 id: system.{slug}.events
@@ -1850,7 +2035,7 @@ nodes:
 relationships:
   - { type: transitions_to, source: node.example.step, target: state.example.done }
 outcomes:
-  - { id: example.done, states: [{ subject: example, value: done }] }
+  - { id: example.done, states: [{ subject: example, value: done }], verified_by: assert.example.works }
 assertions:
   - id: assert.example.works
     claim: "describe what is true, not what the code looks like"

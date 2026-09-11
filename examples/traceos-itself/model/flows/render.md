@@ -15,8 +15,10 @@ relationships:
   - { type: depends_on, source: node.render.compute, target: state.integrity.reported }
   - { type: interacts_with, source: node.render.publish, target: external.reader }
   - { type: transitions_to, source: node.render.publish, target: state.view.published }
+realizes:
+  - intent.a-view-is-not-a-source
 outcomes:
-  - { id: render.published, states: [{ subject: view, value: published }] }
+  - { id: render.published, states: [{ subject: view, value: published }], verified_by: assert.render.view-not-truth }
 assertions:
   - id: assert.render.no-second-implementation
     claim: "every figure on the page is computed by the engine and embedded as a result, so no traversal runs in the browser"

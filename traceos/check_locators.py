@@ -50,27 +50,38 @@ def main() -> int:
     weak_anchor: list[str] = []
     checked = 0
 
-    for aid, assertion in sorted(model.assertions.items()):
-        for evidence in assertion.get("evidence") or []:
-            locator = evidence["locator"]
-            path_part, _, anchor = locator.partition("#")
-            target = repo / path_part
-            checked += 1
-            if not target.is_file():
-                missing_file.append(f"{aid}: {locator}")
-                continue
-            if not anchor:
-                continue
-            how = anchor_present(
-                target.read_text(encoding="utf-8", errors="ignore"), anchor
+    cited: list[tuple[str, str]] = [
+        (aid, evidence["locator"])
+        for aid, assertion in sorted(model.assertions.items())
+        for evidence in assertion.get("evidence") or []
+    ]
+    # INV-028: an Intent's record is an address like any other, and it rots like any
+    # other. It is the one address whose target is frozen, so when it stops resolving
+    # the record moved or was rewritten - which is exactly when a decision has quietly
+    # stopped being the decision.
+    cited += [
+        (iid, intent["record"]["locator"])
+        for iid, intent in sorted(model.intents.items())
+        if (intent.get("record") or {}).get("locator")
+    ]
+
+    for aid, locator in cited:
+        path_part, _, anchor = locator.partition("#")
+        target = repo / path_part
+        checked += 1
+        if not target.is_file():
+            missing_file.append(f"{aid}: {locator}")
+            continue
+        if not anchor:
+            continue
+        how = anchor_present(target.read_text(encoding="utf-8", errors="ignore"), anchor)
+        if not how:
+            missing_anchor.append(f"{aid}: {locator}")
+        elif how == "tail":
+            weak_anchor.append(
+                f"{aid}: {locator} (only '{anchor.rsplit('.', 1)[-1]}' "
+                f"was verified, anywhere in the file)"
             )
-            if not how:
-                missing_anchor.append(f"{aid}: {locator}")
-            elif how == "tail":
-                weak_anchor.append(
-                    f"{aid}: {locator} (only '{anchor.rsplit('.', 1)[-1]}' "
-                    f"was verified, anywhere in the file)"
-                )
 
     for label, items in (
         ("file does not exist", missing_file),
