@@ -63,8 +63,9 @@ What the model declared does not quietly stop resolving. Symbol-granular decay v
 what it excluded (INV-025).
 
 *Claims:* the model does not rot silently.
-*Kills it:* erosion fires often enough on a healthy repository to be tuned out. Unmeasured
-— #10 is the number, and no horizon past this one is worth starting before it exists.
+*Kills it:* erosion fires often enough on a healthy repository to be tuned out. #10 is now
+measured — a median of 3 re-reads per change, down from 12 — so this horizon stands and the
+ones after it are worth starting.
 
 ### H2 — Outcome carries evidence — *mechanism built, value unproven*
 
@@ -163,9 +164,24 @@ comes:
 
 ## The number that governs all of it
 
-**#10 — nobody has measured what it costs to keep a model current.** A peer's trial gave
-a fragment: four `validate` rounds, five assertions, two files of fifty-six. Nobody has
-measured the weekly cost of keeping that from rotting.
+**#10 — what it costs to keep a model current. Measured, and it is not prohibitive.**
+
+The unit is a *re-observation*: a reference a change invalidated, which someone opens,
+reads and confirms. First-time observations are excluded — that is the model growing, not
+the tax of keeping it.
+
+| | n | median | mean | max |
+|---|---|---|---|---|
+| before symbol-granular decay | 20 changes | **11.5** | 15.0 | 80 |
+| after symbol-granular decay | 7 changes | **3.0** | 4.6 | 14 |
+
+A change used to force re-reading roughly 88% of the model's references; it now forces
+about 19%. The three worst figures all predate the narrowing work and were the gate
+generating its own rubber stamps.
+
+**What this does not establish:** n=7, one repository, 16 assertions, one author who wrote
+both the model and the code. The cost on a model somebody else maintains is larger and is
+not knowable from here.
 
 If that number is small, every horizon above is worth building. If it is large, none of
 them matter, because the model will be abandoned before it is ever contradicted by an

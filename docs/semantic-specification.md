@@ -515,6 +515,26 @@ behavior and is valid.
 
 ## 8. Lifecycle and Effective Reality
 
+
+#### Wording is not a contradiction
+
+Nothing in this system reads a claim (§6.1), so "the strings differ" cannot mean "the
+propositions conflict". Treating it that way produced ten errors and an INVALID model
+from five assertions on one subject on the first outside run of this tool, with nothing
+actually in conflict.
+
+Two findings, because two different things were being conflated:
+
+| Finding | Level | Condition |
+|---|---|---|
+| `CONTRADICTION` | error | same subject, overlapping selectors, and the **latest observations disagree** — one supported, one refuted |
+| `SUBJECT_NOT_DISCRIMINATING` | warn | same subject, overlapping selectors, different wording — reported **once per subject** |
+
+The first is decidable and is a real conflict a person must resolve, so it is reported
+per pair. The second is a modelling smell: either the assertions describe different
+aspects and want different subjects, or they compete and want `when` selectors. The
+count of pairs was never information, only arithmetic.
+
 ### INV-016 CURRENT-ONLY-RESOLVES
 
 ```
@@ -757,6 +777,29 @@ carry all four tiers, including an empty `unknown`.
 ---
 
 ## 13. Coverage
+
+#### An impact result that reaches most of the model says nothing
+
+The tiers are useful only while they stay different sizes. Measured (#5):
+
+| graph | entities | median reached by one change | worst |
+|---|---|---|---|
+| synthetic, 10 flows | 61 | 15% | 20% |
+| synthetic, 50 flows, fanout 4 | 301 | 9% | 15% |
+| synthetic, 200 flows, fanout 6 | 1,201 | 5% | 7% |
+| `examples/ecommerce` | 32 | **61%** | 66% |
+| `examples/traceos-itself` | 45 | **56%** | 89% |
+
+**The tier system does not collapse with scale** — that hypothesis is refuted; as the
+graph grows a change reaches proportionally *less* of it, and `certain` stays at two
+entities while `inspect` absorbs the distance. Where it collapses is the opposite end:
+small models in which every flow invokes another, which is what a model looks like in its
+first week.
+
+So the result carries `share_reached` and `discriminates`, and a result above 50% is
+reported as **DID NOT DISCRIMINATE** rather than as an answer — the shape of INV-026 one
+level down. It is a fact about the model, not a finding about the change, and saying so
+prevents the worst reading: that a change genuinely touches two thirds of a system.
 
 ### INV-011 UNCERTAIN-NE-UNKNOWN
 
@@ -1071,6 +1114,19 @@ An observation therefore records `observed_symbol`: a hash of the cited symbol's
 the moment it was read. The line range is derived from git's own hunk header at check
 time and never stored, so INV-022 is untouched; what is stored is a hash of what the
 observer actually read, which is what an observation is for.
+
+The range is resolved with `git blame -L :<symbol> <file>`, which answers **at HEAD**.
+`git log -L` was tried first and is wrong for this: its hunk header reports the range as
+it stood at the last commit that touched the symbol, so any later commit editing the file
+above it shifts the answer — measured here, a 111-line insertion moved a function from
+line 717 to 747 and the hash was taken over the wrong 68 lines.
+
+Trailing blank lines are dropped before hashing, for the same reason `observed_norm`
+drops them: git's funcname block includes the blank lines that follow a symbol, so
+inserting a new function *after* one otherwise reads as an edit *to* it.
+
+Both were false positives in the safe direction. Both were still wrong, and a checker that
+cries wolf is discharged by rubber stamp (§13.0.1).
 
 Order of answers, strongest first:
 
