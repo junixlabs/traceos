@@ -25,7 +25,14 @@ python3 -m traceos.check_locators examples/traceos-itself
 ruff check traceos tests && ruff format traceos tests
 ```
 
-CI runs the same four, on Python 3.11, 3.12 and 3.13.
+CI runs the same four, on Python 3.11, 3.12 and 3.13, and reports branch coverage
+over `traceos/` as a fifth job.
+
+**Coverage is reported, never gated.** A threshold set before anyone has seen the
+figure encodes whatever the code happened to do that week. The figure as of the job
+landing: 84% overall, `engine.py` 87%, `cli.py` 65% — the engine, where the semantics
+live, is the well-covered part, and the gap is in argument handling and output
+formatting.
 
 ## Rules a change has to keep
 

@@ -1563,6 +1563,62 @@ def tool_decay_ratchet():
     )
 
 
+def tool_reflow_is_not_a_change():
+    """A formatter run must not invalidate a claim; a reindent must.
+
+    Raised by a reviewer: a content hash fires on a rewrap, a reindent and a
+    repo-wide formatter run, none of which change behavior. Only the part that is
+    safe without parsing the host language is normalised away.
+    """
+    tmp = pathlib.Path(tempfile.mkdtemp(prefix="traceos-reflow-"))
+    try:
+        git_repo(tmp)
+        git = T.Git(tmp)
+        target = tmp / "src" / "svc.py"
+        target.write_text("def run():\n    return 1\n")
+        import subprocess
+
+        subprocess.run(("git", "-C", str(tmp), "add", "."), capture_output=True)
+        subprocess.run(("git", "-C", str(tmp), "commit", "-m", "x"), capture_output=True)
+        head = git.head()
+        blob = git.blob("src/svc.py")
+        norm = git.normalised_blob("src/svc.py")
+
+        target.write_text("def run():   \n    return 1\n\n\n")
+        check(
+            "TOOL reflow",
+            "trailing whitespace and blank lines do not invalidate an observation",
+            git.changed_since(head, "src/svc.py", blob, norm) is False,
+        )
+        check(
+            "TOOL reflow",
+            "without the normalised hash the same edit still reads as a change",
+            git.changed_since(head, "src/svc.py", blob) is True,
+        )
+
+        target.write_text("def run():\n        return 1\n")
+        check(
+            "TOOL reflow",
+            "a reindent is a change, because indentation is semantic in Python",
+            git.changed_since(head, "src/svc.py", blob, norm) is True,
+        )
+
+        target.write_text("def run():\n    return 2\n")
+        check(
+            "TOOL reflow",
+            "a real edit is still a change",
+            git.changed_since(head, "src/svc.py", blob, norm) is True,
+        )
+
+        check(
+            "TOOL reflow",
+            "an observation recorded before this existed still works",
+            git.changed_since(head, "src/svc.py", blob, None) is True,
+        )
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 def tool_stale_references():
     """The ratchet names the references to check, not just the assertion.
 
@@ -1728,6 +1784,7 @@ TOOLING = [
     tool_ratchet,
     tool_decay_ratchet,
     tool_stale_references,
+    tool_reflow_is_not_a_change,
     tool_anchor_rot,
     tool_monorepo_prefix,
     tool_explore,

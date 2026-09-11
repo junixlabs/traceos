@@ -38,9 +38,15 @@ reference: "apps/api/src/payment/processor.ts#processPayment"
 observed_at: 2026-09-10T04:12:00Z
 observed_ref: "a1b2c3d"        # commit sha | trace id | doc version
 observed_blob: "9daeafb..."    # content hash of the artifact as checked
+observed_norm: "3f1c2ad..."    # the same, ignoring line endings and trailing space
 supports: supports             # | refutes | inconclusive
 observer: agent                # | human | ci
 ```
+
+`observed_norm` is what stops a formatter run invalidating the whole model. It is
+the only normalisation available without parsing the host language, so a rewrap or a
+reindent still counts as a change — a known false positive, kept because the
+alternative is missing a real one.
 
 `observed_blob` is what makes the check survive the shape of your history. "Has a
 commit touched this file" is not the question — squashing a branch touches every file
