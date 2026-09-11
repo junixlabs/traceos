@@ -13,9 +13,15 @@ lands cleanly in its own tier.
 | **Evidence Observation** | the *act of checking*, at a particular moment | RECORDED, append-only | no |
 
 A **record** is true about its moment and never becomes wrong. A **claim** is about
-now, and can. Only the claim owes a re-check — but prose written *from* a record
-turns a historical statement into a present-tense one, and the record cannot warn
-anybody, because it was never wrong. That copy is the one that rots, and every
+now, and can. Only the claim owes a re-check.
+
+**A statement is a record once it was frozen — released, tagged, published — not
+because of the file it lives in.** An unreleased changelog section is a draft of a
+record and still a claim. An observation is frozen the instant it exists, which is
+what earns it the RECORDED tier.
+
+Prose written *from* a frozen record turns a historical statement into a
+present-tense one, and the record cannot warn anybody, because it was never wrong. That copy is the one that rots, and every
 identifier in it can still resolve while the sentence is false.
 
 A reference is only an address. It cannot tell you whether what lives there still
