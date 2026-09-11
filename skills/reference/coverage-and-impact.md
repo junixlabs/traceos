@@ -90,6 +90,12 @@ its own is the mechanism working — and on its own it is still only a disclosur
 - **Discharge on touch.** An uncertain assertion citing a file this change edits is
   re-asserted or deleted **in this change**. Not eventually, not on a sweep.
 
+The gate names the **references** to check, not just the assertion — including ones
+that went stale before this change, since the assertion stays uncertain until those
+are checked too. Re-observe that set and nothing else. Measured on this repository's
+own history, re-observing every reference of a flagged assertion put 27% of all
+observations on files the change never touched.
+
 **Deleting the assertion is a legal discharge, and often the honest one.** One that
 has gone uncertain across several changes to its own cited artifact is not stale, it
 is abandoned. Re-asserting without actually checking launders an unverified claim

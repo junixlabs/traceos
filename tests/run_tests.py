@@ -1563,6 +1563,83 @@ def tool_decay_ratchet():
     )
 
 
+def tool_stale_references():
+    """The ratchet names the references to check, not just the assertion.
+
+    Measured on this repository: 27% of observations cited a file the change never
+    touched, because the caller re-observed every reference of a flagged assertion.
+    """
+    model = T.Model(EXAMPLE)
+
+    check(
+        "TOOL stale refs",
+        "a reference nobody ever observed is stale",
+        T.stale_references(model, "assert.retry.scheduled")
+        == ["deploy/cron.yaml#retry-payments"],
+        str(T.stale_references(model, "assert.retry.scheduled")),
+    )
+
+    gateway = T.stale_references(model, "assert.payment.gateway-v1")
+    check(
+        "TOOL stale refs",
+        "an observed reference is not reported alongside an unobserved one",
+        gateway == ["src/payment/GatewayResolver.ts#resolve"],
+        str(gateway),
+    )
+
+    check(
+        "TOOL stale refs",
+        "an assertion whose references are all observed has none stale",
+        T.stale_references(model, "assert.purchase.confirms-order") == [],
+        str(T.stale_references(model, "assert.purchase.confirms-order")),
+    )
+
+    touched = T.decay_ratchet(model, ["deploy/cron.yaml"], NOW, None, ["deploy/"], 0)
+    item = touched["undischarged"][0]
+    check(
+        "TOOL stale refs",
+        "the ratchet carries the stale set, so it is discoverable in one run",
+        item["stale"] == ["deploy/cron.yaml#retry-payments"],
+        str(item),
+    )
+
+    tmp = pathlib.Path(tempfile.mkdtemp(prefix="traceos-stale-"))
+    try:
+        git_repo(tmp)
+        out = tmp / "traceos"
+        T.init(tmp, out, "Demo")
+        flow = out / "model" / "flows" / "example.md"
+        flow.write_text(
+            flow.read_text().replace(
+                '      - { kind: implementation, locator: "path/to/File.ext#symbol" }',
+                '      - { kind: implementation, locator: "src/svc.ts#run" }\n'
+                '      - { kind: test, locator: "src/other.ts#check" }',
+            )
+        )
+        scaffold = T.Model(out)
+        both = T.stale_references(scaffold, "assert.example.works")
+        check(
+            "TOOL stale refs",
+            "two unobserved references are both named, not one at a time",
+            both == ["src/svc.ts#run", "src/other.ts#check"],
+            str(both),
+        )
+
+        item = T.decay_ratchet(scaffold, ["src/svc.ts"], NOW, None, ["src/"], 0)[
+            "undischarged"
+        ][0]
+        extra = [r for r in item["stale"] if r not in item["references"]]
+        check(
+            "TOOL stale refs",
+            "a reference stale before this change is named too, not left for the "
+            "next run to find",
+            extra == ["src/other.ts#check"],
+            str(item),
+        )
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 def tool_anchor_rot():
     """A heading that renumbers is rot, and the dotted-tail fallback used to hide it."""
     from traceos import check_locators
@@ -1650,6 +1727,7 @@ TOOLING = [
     tool_content_not_history,
     tool_ratchet,
     tool_decay_ratchet,
+    tool_stale_references,
     tool_anchor_rot,
     tool_monorepo_prefix,
     tool_explore,
