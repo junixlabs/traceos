@@ -3,12 +3,18 @@
 Lets AI agents trace semantic impact before a change and reconcile the model
 with reality after it.
 
-The package keeps the `traceos` module name the command line always had, so
-`import traceos` keeps working for embedders. The test suite imports the
-submodules directly (`from traceos import cli, engine`), so it is not a reason
-to keep this re-export - an embedder is.
+`main` and `parse_context` stay importable from the package for embedders. They
+are resolved lazily: importing `.cli` at module scope put it in `sys.modules`
+before `python3 -m traceos.cli` executed it, and Python printed a RuntimeWarning
+about unpredictable behaviour into the user's output on every such run.
 """
 
-from .cli import main, parse_context
-
 __all__ = ["main", "parse_context"]
+
+
+def __getattr__(name: str):
+    if name in __all__:
+        from . import cli
+
+        return getattr(cli, name)
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
