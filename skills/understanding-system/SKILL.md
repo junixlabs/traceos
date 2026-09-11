@@ -1,13 +1,16 @@
 ---
 name: understanding-system
-description: Build or update a TraceOS System Model from evidence, without treating code, docs, or assumptions as established reality. Use when onboarding a repository, establishing a model, understanding an existing Flow, discovering missing Nodes or Relationships, investigating uncertainty, or measuring model Coverage.
+description: Create and update the TraceOS System Model from evidence, keeping observed, inferred, declared and unknown apart instead of treating code, docs or assumptions as established reality. Use when onboarding a repository, establishing a model, understanding an existing Flow, discovering missing Nodes or Relationships, investigating uncertainty, or measuring model Coverage.
 ---
 
 # Understanding System
 
 ## Purpose
 
-Construct a trustworthy behavioral model from evidence.
+**Create and update the System Model from evidence.** That is the whole job: this skill
+owns what the model says, and it owns nothing else. It does not decide what a change
+affects (`tracing-change`), it does not judge the model (the validator), and it does not
+write code (the agent).
 
 > Evidence before assertion. Semantic behavior over implementation structure.
 
@@ -32,6 +35,10 @@ the rules. Load the reference file you need:
 
 ## When NOT to use
 
+- Scaffolding a model directory on a repository with none — `traceos init` is a
+  bootstrap operation, not a skill. Run it, then start this skill at step 1. `init`
+  indexes files; it names no Flow and suggests no boundary, because a wrong suggestion
+  at step one is copied forward and never re-examined.
 - Implementing a requested code change — that is not a TraceOS skill.
 - Tracing the impact of a change → `tracing-change`.
 - Checking whether the model still holds after a change → `reconciling-reality`.
@@ -75,6 +82,29 @@ State needs `subject` + `value` and must be semantically significant. `retry_cou
 qualifies only when something depends on it (INV-003).
 
 Events are semantic occurrences, emitted and listened to (INV-005).
+
+### 4b. Know which way each statement entered the model
+
+Every statement in the model arrived by one of four routes, and they are not
+interchangeable. Before writing an Assertion, say which one this is:
+
+| Route | What it means | What the model must carry |
+|---|---|---|
+| **Observed** | you read the artifact and it says this | an evidence reference **and** an observation appended against it (INV-020) |
+| **Inferred** | it follows from something observed, but no artifact states it | the observed premises as evidence; the claim stays `uncertain` until one supports it directly |
+| **Declared** | a human asserted it and no artifact can settle it — an intent, a policy, a contract with an External | `observer: human` on the observation, so the reader knows what kind of thing backs it |
+| **Unknown** | nothing establishes it either way | **not an Assertion.** It is a coverage gap, reported by name (INV-011, INV-012) |
+
+The engine already refuses to let an inference pass as an observation: an evidence
+reference with no observation resolves `uncertain` and reports
+`REFERENCE_NEVER_OBSERVED`, and confidence is computed from the observation log, never
+authored (INV-009). So the failure mode is not writing a confident lie — it is writing
+an Assertion for something that belongs in the Unknown column, which converts a
+reportable gap into a claim nobody will re-check.
+
+The routes are not a ranking. A Declared contract with an External is often the
+strongest thing available; an Observed line of code is weak evidence that production
+behaves that way.
 
 ### 5. Record Evidence references, then observe
 

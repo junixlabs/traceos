@@ -18,7 +18,7 @@ assertions:
     lifecycle: current
     about: [flow.implement]
     evidence:
-      - { kind: documentation, locator: "skills/README.md#Two things deliberately left out" }
+      - { kind: documentation, locator: "skills/README.md#Three things deliberately left out" }
       - { kind: documentation, locator: "docs/semantic-specification.md#Non-goals" }
 ---
 
