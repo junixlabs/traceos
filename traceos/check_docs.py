@@ -38,6 +38,19 @@ def main() -> int:
     appendix = spec_text[spec_text.index("## Appendix A") :]
     indexed = set(INV.findall(appendix))
 
+    # INV-026. Every source empty is the shape of a broken run, not a clean one:
+    # a wrong root, a rename, a read that failed. Assert the floor before
+    # comparing sets, because comparing empty sets always agrees.
+    if not (spec_ids and reference and engine and indexed):
+        print(
+            "could not establish: one of the four sources yielded no invariant "
+            f"at all (spec {len(spec_ids)}, skills {len(reference)}, "
+            f"engine {len(engine)}, appendix {len(indexed)}).\n"
+            "An empty scan is not a pass.",
+            file=sys.stderr,
+        )
+        return 2
+
     problems: list[str] = []
 
     def report(label: str, missing: set[str]) -> None:

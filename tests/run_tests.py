@@ -1708,6 +1708,44 @@ def tool_reflow_is_not_a_change():
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+def tool_positive_controls():
+    """INV-026 applied to the checkers themselves: zero checked is not zero wrong.
+
+    Reported by a reviewer whose own evaluation script silenced grep's stderr,
+    passed a path that did not exist, and got a total, uniform, silent failure -
+    caught only because 100% unresolvable was an implausible answer, not because
+    anything said so.
+    """
+    from traceos import check_docs, check_locators
+
+    tmp = pathlib.Path(tempfile.mkdtemp(prefix="traceos-empty-"))
+    try:
+        (tmp / "model").mkdir()
+        (tmp / "model" / "system.md").write_text(
+            "---\nid: sys\ntype: system\nname: Empty\n---\n"
+        )
+        argv = sys.argv
+        try:
+            sys.argv = ["check_locators", str(tmp)]
+            code = check_locators.main()
+        finally:
+            sys.argv = argv
+        check(
+            "TOOL positive controls",
+            "a model declaring no evidence cannot report a clean locator run",
+            code == 2,
+            f"exit {code}",
+        )
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+    check(
+        "TOOL positive controls",
+        "the docs check still passes on the real tree",
+        check_docs.main() == 0,
+    )
+
+
 def tool_stale_references():
     """The ratchet names the references to check, not just the assertion.
 
@@ -1873,6 +1911,7 @@ TOOLING = [
     tool_ratchet,
     tool_decay_ratchet,
     tool_stale_references,
+    tool_positive_controls,
     tool_reflow_is_not_a_change,
     tool_empty_scan_is_not_a_pass,
     tool_anchor_rot,

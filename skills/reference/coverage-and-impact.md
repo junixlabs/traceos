@@ -133,7 +133,13 @@ count. Zero there means the scope names nothing the model knows about, and that 
 fail closed: a mistyped `--scope` would otherwise make the gate green forever.
 
 `ratchet` exits **2** when its scope matches no artifact, when its decay scope matches
-no assertion, or when it was handed a changed set with nothing in it.
+no assertion, or when it was handed a changed set with nothing in it. The same floor
+applies to every checker: `check_locators` and `check_docs` exit 2 rather than green
+when they examined nothing.
+
+**Write the positive control before trusting the result.** Assert that the check can
+find something it must find, or a run where every lookup failed for one reason —
+a wrong root, a silenced error stream — reports as total, uniform and clean.
 
 A claim whose artifact left the scope is still in the model and still in the
 denominator. It cannot be observed, and unobservable is a *result* — record it as

@@ -91,6 +91,19 @@ def main() -> int:
             "  silently (INV-025); prefer an anchor this tool can verify in full."
         )
 
+    # INV-026. Zero checked is not zero wrong: a model path that resolved to
+    # nothing, or a tree that failed to parse, reported "0/0 resolve" and exited
+    # clean. Reported elsewhere in the same week: a checker silenced grep's stderr,
+    # every lookup returned not-found, and the failure was total, uniform and
+    # silent - caught only because 100% was an implausible answer.
+    if checked == 0:
+        print(
+            "\ncould not establish: this model declares no evidence reference at "
+            "all.\nAn empty scan is not a pass - check the model path parses.",
+            file=sys.stderr,
+        )
+        return 2
+
     total = len(missing_file) + len(missing_anchor)
     print(f"\n{checked - total}/{checked} evidence locators resolve")
     return 1 if total else 0
