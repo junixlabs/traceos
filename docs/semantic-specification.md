@@ -360,7 +360,20 @@ reported (`REFERENCE_NEVER_OBSERVED`), which is what surfaces a re-anchor that w
 never re-verified — and which clears once it is.
 
 `artifact_changed_since` compares the artifact's **content** to what it was when
-observed, and falls back to history only when no content hash was recorded. History
+observed, and falls back to history only when no content hash was recorded.
+
+An observation SHOULD record a second hash, `observed_norm`, over the same content
+with line endings, trailing whitespace and trailing blank lines removed. A change
+that survives only in those is not a change, and a formatter run that rewrote every
+file in the repository must not invalidate every claim in the model.
+
+That is the whole set of normalisation available without parsing the host language.
+Collapsing interior whitespace would hide a real change in Python, YAML and Markdown
+alike, where indentation and blank lines carry meaning. **So a rewrap or a reindent
+still invalidates an observation, and this is a known false positive** — kept because
+the alternative is a false negative, and a check that misses a real change is worse
+than one that asks again. Measured over this repository's history: 0 of 31 changes to
+a cited artifact were whitespace-only, so the residual class has not yet fired here. History
 answers "did a commit touch this file", which is not the question: squashing a branch
 produces a commit that re-touches every file the branch changed, so an observation
 recorded before the merge would read as invalidated by its own merge. An Evidence

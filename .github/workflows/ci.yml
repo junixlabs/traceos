@@ -86,6 +86,37 @@ jobs:
           print("schema ok")
           PY
 
+  coverage:
+    name: Branch coverage
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - run: pip install --disable-pip-version-check coverage .
+      # Reported, never gated. A ratchet set before anyone has seen the figure
+      # encodes whatever the code happened to do that week (#7).
+      - name: The suite, plus the commands CI actually runs
+        run: |
+          cov() { python3 -m coverage run --branch --parallel-mode --source=traceos "$@"; }
+          cov tests/run_tests.py
+          cov -m traceos.check_docs
+          cov -m traceos.check_locators examples/traceos-itself
+          cov -m traceos.site --out /tmp/cov-site --repo .
+          cov -m traceos.cli validate examples/ecommerce \
+            --repo-files examples/ecommerce/repo-files.txt
+          cov -m traceos.cli validate examples/traceos-itself --repo .
+          cov -m traceos.cli resolve examples/ecommerce --context tenant=a
+          cov -m traceos.cli impact examples/ecommerce \
+            --changed src/refund/RefundService.ts
+          cov -m traceos.cli coverage examples/ecommerce \
+            --repo-files examples/ecommerce/repo-files.txt
+          cov -m traceos.cli explore examples/ecommerce --out /tmp/cov.html
+          python3 -m coverage combine
+          python3 -m coverage report --show-missing --skip-covered
+          python3 -m coverage report >> "$GITHUB_STEP_SUMMARY"
+
   docs:
     name: Docs consistency
     runs-on: ubuntu-latest

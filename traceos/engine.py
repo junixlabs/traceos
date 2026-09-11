@@ -14,6 +14,7 @@ works from an installed wheel as well as from a checkout.
 from __future__ import annotations
 
 import datetime as dt
+import hashlib
 import json
 import pathlib
 import re
@@ -315,7 +316,35 @@ class Git:
         """Content hash of the file as it is right now."""
         return self._run("hash-object", "--", _norm_path(path))
 
-    def changed_since(self, ref: str, path: str, blob: str | None = None) -> bool | None:
+    def normalised_blob(self, path: str) -> str | None:
+        """Content hash ignoring what no language gives meaning to.
+
+        Line endings, trailing whitespace and trailing blank lines only. That is
+        the whole set which is safe without parsing the host language - collapsing
+        interior whitespace would hide a real change in Python, YAML and Markdown
+        alike, where indentation and blank lines carry meaning.
+
+        So a rewrap or a reindent still invalidates an observation. That is a known
+        false positive, kept because the alternative is a false negative, and a
+        checker that misses a real change is worse than one that asks again.
+        """
+        target = (self.repo / _norm_path(path)) if self.repo else None
+        if target is None or not target.is_file():
+            return None
+        try:
+            text = target.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            return None
+        body = "\n".join(line.rstrip() for line in text.splitlines()).rstrip("\n")
+        return hashlib.sha1(body.encode("utf-8")).hexdigest()
+
+    def changed_since(
+        self,
+        ref: str,
+        path: str,
+        blob: str | None = None,
+        norm_blob: str | None = None,
+    ) -> bool | None:
         """spec 6.3 artifact_changed_since. None means it could not be determined.
 
         Content first, history second. History answers "did a commit touch this",
@@ -326,7 +355,15 @@ class Git:
         """
         if blob:
             current = self.blob(path)
-            return None if current is None else current != blob
+            if current is None:
+                return None
+            if current == blob:
+                return False
+            if norm_blob:
+                current_norm = self.normalised_blob(path)
+                if current_norm is not None and current_norm == norm_blob:
+                    return False
+            return True
         if self._run("cat-file", "-e", f"{ref}^{{commit}}") is None:
             return None
         out = self._run("rev-list", f"{ref}..HEAD", "--", _norm_path(path))
@@ -615,6 +652,7 @@ def stale_references(
                 observation.get("observed_ref"),
                 reference.split("#", 1)[0],
                 observation.get("observed_blob"),
+                observation.get("observed_norm"),
             )
             if changed is True:
                 stale.append(reference)
@@ -675,6 +713,7 @@ def computed_confidence(
                     ref,
                     reference.split("#", 1)[0],
                     observation.get("observed_blob"),
+                    observation.get("observed_norm"),
                 )
                 if changed is True:
                     return "uncertain"
@@ -1288,6 +1327,7 @@ def observe(
         "observed_at": at_time.isoformat().replace("+00:00", "Z"),
         "observed_ref": ref,
         "observed_blob": blob,
+        "observed_norm": git.normalised_blob(match.split("#", 1)[0]),
         "supports": supports,
         "observer": observer,
         "kind": kind or declared[match]["kind"],
