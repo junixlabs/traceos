@@ -3,7 +3,7 @@
 
 The page is a VIEW over the model, never a source of truth: it is regenerated, not
 edited. Every derived figure on it - effective reality, impact, coverage, integrity -
-is computed by tools/traceos.py and embedded as a result. Nothing is recomputed in
+is computed by the engine and embedded as a result. Nothing is recomputed in
 JavaScript, so there is no second implementation to drift from the engine.
 """
 
@@ -17,6 +17,10 @@ import pathlib
 from . import engine as T
 
 NODE_W, NODE_H, COL_GAP, ROW_GAP, PAD, CHIP_H = 168, 46, 96, 22, 26, 15
+
+# Colour is never the only carrier of confidence: a filled, half and hollow ring
+# read the same to a reader who cannot separate green from amber.
+CONF_GLYPH = {"confirmed": "\u25cf", "likely": "\u25d0", "uncertain": "\u25cb"}
 
 TYPE_COLOR = {
     "action": "var(--action)",
@@ -126,10 +130,20 @@ def flow_svg(model: T.Model, fid: str) -> str:
             f'marker-end="url(#a)"/>'
         )
         if rel.get("condition"):
+            label = rel["condition"]
+            ly = (y1 + y2) / 2 + bow - 6
+            # A plate under the label, because the edge it names runs behind it.
+            # General rather than a fourth special case: it holds whatever the
+            # layout happens to route underneath (#9).
+            plate_w = 7 * len(label) + 10
+            parts.append(
+                f'<rect class="condbg" x="{mid - plate_w / 2:.0f}" '
+                f'y="{ly - 9:.0f}" width="{plate_w:.0f}" height="13" rx="3"/>'
+            )
             parts.append(
                 f'<text class="cond" x="{mid:.0f}" '
-                f'y="{(y1 + y2) / 2 + bow - 6:.0f}" text-anchor="middle">'
-                f"{html.escape(rel['condition'])}</text>"
+                f'y="{ly:.0f}" text-anchor="middle">'
+                f"{html.escape(label)}</text>"
             )
 
     for node_id in nodes:
@@ -193,7 +207,7 @@ def build(
             rows.append(
                 f'<tr><td class="mono">{e(subject)}</td>'
                 f"<td>{e(str(value['value']) if value['value'] else '—')}</td>"
-                f'<td><span class="pill {conf}">{conf}</span></td>'
+                f'<td><span class="conf {conf}">{CONF_GLYPH[conf]} {conf}</span></td>'
                 f'<td><span class="pill {"bad" if status != "RESOLVED" else "ok"}">'
                 f"{status}</span></td>"
                 f'<td class="mono dim">{e(", ".join(value["assertions"]))}</td></tr>'
@@ -210,6 +224,9 @@ def build(
         f"{e(ctx_label(ctx))}</button>"
         for i, (ctx, _) in enumerate(realities)
     )
+
+    def conf_of(aid: str) -> str:
+        return T.computed_confidence(model, aid, now, git)
 
     flow_cards = []
     downstream = {
@@ -229,7 +246,9 @@ def build(
             for o in flow.get("outcomes") or []
         )
         assertions = "".join(
-            f'<li><span class="mono dim">{e(a["id"])}</span><br>{e(a["claim"])}'
+            f'<li><span class="conf {conf_of(a["id"])}">'
+            f"{CONF_GLYPH[conf_of(a['id'])]} {conf_of(a['id'])}</span> "
+            f'<span class="mono dim">{e(a["id"])}</span><br>{e(a["claim"])}'
             + (
                 f' <span class="pill sel">when {e(json.dumps(a["when"]))}</span>'
                 if a.get("when")
@@ -327,7 +346,34 @@ def build(
 body {{ margin:0; background:var(--bg); color:var(--ink);
   font:14px/1.55 ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif; }}
 .wrap {{ max-width:1180px; margin:0 auto; padding:28px 22px 80px }}
-h1 {{ font-size:24px; margin:0 0 4px }} h2 {{ font-size:17px; margin:34px 0 12px }}
+h1 {{ font-size:24px; margin:0; letter-spacing:-.01em }}
+h2 {{ font-size:17px; margin:40px 0 12px; scroll-margin-top:64px }}
+
+.top {{ border-bottom:1px solid var(--line); padding-bottom:16px; margin-bottom:0 }}
+.idline {{ display:flex; align-items:baseline; gap:12px; flex-wrap:wrap }}
+.verdict {{ font:600 11px/1 ui-monospace,monospace; letter-spacing:.08em;
+  padding:5px 9px; border-radius:5px; border:1px solid currentColor }}
+.verdict.ok {{ color:var(--ok) }} .verdict.bad {{ color:var(--warn) }}
+.stats {{ display:flex; gap:26px; flex-wrap:wrap; margin:14px 0 10px }}
+.stats div {{ display:flex; flex-direction:column; gap:1px }}
+.stats b {{ font:600 20px/1.1 ui-monospace,monospace; font-variant-numeric:tabular-nums }}
+.stats span {{ font-size:11px; color:var(--muted); text-transform:uppercase;
+  letter-spacing:.06em }}
+.path {{ font-size:11px }}
+
+.jump {{ position:sticky; top:0; z-index:20; display:flex; gap:2px; flex-wrap:wrap;
+  background:var(--bg); border-bottom:1px solid var(--line); margin:0 0 22px;
+  padding:8px 0 }}
+.jump a {{ font-size:12px; color:var(--muted); text-decoration:none; padding:5px 10px;
+  border-radius:5px; cursor:pointer; transition:color .18s, background .18s }}
+.jump a:hover {{ color:var(--ink); background:var(--card) }}
+.jump a:focus-visible, .ctx-btn:focus-visible, select:focus-visible {{
+  outline:2px solid var(--action); outline-offset:2px }}
+
+.conf {{ font-size:11px; white-space:nowrap; font-variant-numeric:tabular-nums }}
+.conf.confirmed {{ color:var(--ok) }} .conf.likely {{ color:var(--warn) }}
+.conf.uncertain {{ color:var(--err) }}
+@media (prefers-reduced-motion:reduce) {{ * {{ transition:none !important }} }}
 h3 {{ font-size:15px; margin:0; font-family:ui-monospace,monospace }}
 h4 {{ font-size:12px; margin:0 0 6px; text-transform:uppercase;
   letter-spacing:.06em; color:var(--muted); font-weight:600 }}
@@ -351,6 +397,7 @@ h4 {{ font-size:12px; margin:0 0 6px; text-transform:uppercase;
 svg text {{ font:12px ui-sans-serif,system-ui,sans-serif; fill:var(--ink) }}
 svg .nname {{ font-weight:600 }} svg .ntype {{ font-size:10px }}
 svg .cond {{ font-size:10px; fill:var(--muted) }}
+svg .condbg {{ fill:var(--card) }}
 svg .chip {{ font-size:10px; font-family:ui-monospace,monospace }}
 .cols {{ display:grid; grid-template-columns:repeat(auto-fit,minmax(230px,1fr));
   gap:20px }}
@@ -366,7 +413,12 @@ td {{ padding:6px 8px 6px 0; border-bottom:1px solid var(--line);
 .ctx-btn.on {{ color:var(--ink); border-color:var(--ink) }}
 .tiers {{ display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr));
   gap:14px; margin-top:12px }}
-.tier {{ border:1px solid var(--line); border-radius:7px; padding:10px 12px }}
+.tier {{ border:1px solid var(--line); border-left-width:3px; border-radius:7px;
+  padding:10px 12px; background:var(--card) }}
+.tier.certain {{ border-left-color:var(--err) }}
+.tier.likely {{ border-left-color:var(--warn) }}
+.tier.inspect {{ border-left-color:var(--action) }}
+.tier.unknown {{ border-left-color:var(--muted) }}
 .tier h5 {{ margin:0 0 6px; font-size:12px; text-transform:uppercase;
   letter-spacing:.05em }}
 .tier.certain h5 {{ color:var(--err) }} .tier.likely h5 {{ color:var(--warn) }}
@@ -382,28 +434,37 @@ select {{ font:inherit; padding:6px 10px; border-radius:6px; background:var(--ca
 .empty {{ color:var(--muted); font-style:italic }}
 </style></head><body><div class="wrap">
 
-<h1>{e(system_name)}</h1>
-<div class="dim mono">{e(str(model_dir.resolve()))} · generated {now:%Y-%m-%d %H:%M} UTC ·
-integrity: <span class="pill {"ok" if verdict == "VALID" else "bad"}">{
-        verdict
-    }</span></div>
+<header class="top">
+  <div class="idline">
+    <h1>{e(system_name)}</h1>
+    <span class="verdict {"ok" if verdict == "VALID" else "bad"}">{verdict}</span>
+  </div>
+  <div class="stats">
+    <div><b>{len(model.flows)}</b><span>flows</span></div>
+    <div><b>{len(model.nodes)}</b><span>nodes</span></div>
+    <div><b>{len(model.assertions)}</b><span>assertions</span></div>
+    <div><b>{len(model.observations)}</b><span>observations</span></div>
+    <div><b>{len(findings)}</b><span>findings</span></div>
+  </div>
+  <div class="dim mono path">{e(str(model_dir.resolve()))} · {
+        now:%Y-%m-%d %H:%M} UTC</div>
+</header>
+
+<nav class="jump">
+  <a href="#flows">Flows</a><a href="#reality">Effective reality</a>
+  <a href="#impact">Impact</a><a href="#coverage">Coverage</a>
+  <a href="#validation">Validation</a>
+</nav>
 
 <div class="banner">
   <b>This page is a view, not a source of truth.</b> Regenerate it; never edit it.
   Effective reality, impact, coverage and integrity below were computed by
-  <span class="mono">tools/traceos.py</span> and embedded as results — nothing is
+  <span class="mono">traceos/engine.py</span> and embedded as results — nothing is
   recomputed in the browser, so there is no second implementation to drift from the
   engine.
 </div>
 
-<h2>Effective reality <span class="dim">— derived, per context</span></h2>
-<div>{ctx_buttons}</div>
-{"".join(reality_blocks)}
-<p class="note">Only <code>current</code> assertions resolve. A context is part of
-the question: the same model answers differently for different tenants without the
-graph being forked (INV-008, INV-016).</p>
-
-<h2>Flows <span class="dim">— authored</span></h2>
+<h2 id="flows">Flows <span class="dim">— authored, the behavior itself</span></h2>
 <div class="legend">
   <span style="color:var(--action)">■ action</span>
   <span style="color:var(--decision)">■ decision</span>
@@ -415,7 +476,16 @@ graph being forked (INV-008, INV-016).</p>
 <p class="note">Parallel branches are drawn as the absence of a
 <code>next</code> arrow, not as a fork construct (INV-021).</p>
 
-<h2>Impact <span class="dim">— derived, four tiers</span></h2>
+<h2 id="reality">Effective reality <span class="dim">— derived, per context</span></h2>
+<div class="card">
+<div>{ctx_buttons}</div>
+{"".join(reality_blocks)}
+<p class="note">Only <code>current</code> assertions resolve. A context is part of
+the question: the same model answers differently for different tenants without the
+graph being forked (INV-008, INV-016).</p>
+</div>
+
+<h2 id="impact">Impact <span class="dim">— derived, four tiers</span></h2>
 <div class="card">
   <select id="loc">{impact_options}</select>
   <div class="tiers" id="tiers"></div>
@@ -423,10 +493,10 @@ graph being forked (INV-008, INV-016).</p>
   <code>not mapped</code> does not mean <code>not affected</code> (INV-019).</p>
 </div>
 
-<h2>Coverage <span class="dim">— derived</span></h2>
+<h2 id="coverage">Coverage <span class="dim">— derived</span></h2>
 <div class="card">{coverage_html}</div>
 
-<h2>Validation <span class="dim">— {len(findings)} finding(s)</span></h2>
+<h2 id="validation">Validation <span class="dim">— {len(findings)} finding(s)</span></h2>
 <div class="card">
   {
         "<table><thead><tr><th></th><th>code</th><th>message</th><th>where</th></tr>"
@@ -518,5 +588,6 @@ def standalone_svg(model: T.Model, fid: str, dark: bool = False) -> str:
         '<text class="cond"',
         f'<text font-family="{FONT}" font-size="10" fill="{theme["--muted"]}"',
     )
+    svg = svg.replace('<rect class="condbg"', f'<rect fill="{theme["--card"]}"')
     svg = svg.replace('<text class="chip"', f'<text font-family="{MONO}" font-size="10"')
     return svg.replace("<svg ", '<svg xmlns="http://www.w3.org/2000/svg" ', 1)

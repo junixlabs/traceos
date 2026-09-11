@@ -1346,7 +1346,7 @@ def tool_explore():
         "gateway v2" in page and "gateway v1" in page,
     )
 
-    coverage_section = page[page.index("<h2>Coverage") : page.index("<h2>Validation")]
+    coverage_section = page[page.index('id="coverage"') : page.index('id="validation"')]
     check(
         "TOOL explore",
         "coverage shows no percentage (INV-012)",
@@ -1377,6 +1377,25 @@ def tool_explore():
         "TOOL explore",
         "generated views are gitignored",
         "explore.html" in (ROOT / ".gitignore").read_text(),
+    )
+
+    check(
+        "TOOL explore",
+        "the diagrams lead: flows come before the derived tables",
+        page.index('id="flows"') < page.index('id="reality"') < page.index('id="impact"'),
+    )
+    check(
+        "TOOL explore",
+        "an edge label is plated, so the edge running behind it stays readable",
+        page.count('class="condbg"') == page.count('class="cond"'),
+        "{} plates for {} labels".format(
+            page.count('class="condbg"'), page.count('class="cond"')
+        ),
+    )
+    check(
+        "TOOL explore",
+        "confidence carries a glyph, so colour is never the only indicator",
+        all(g in page for g in ("\u25cf", "\u25d0", "\u25cb")),
     )
 
     entry = page.index('id="flow.purchase"')
