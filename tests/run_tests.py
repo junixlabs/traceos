@@ -1304,6 +1304,14 @@ def tool_symbol_decay():
         run("checkout", "-q", "--orphan", "rewritten")
         run("add", "-A")
         run("commit", "-qm", "history rewritten, every old commit orphaned")
+        # validate() with a real Git was reachable only through the CLI, so a
+        # function that returned None instead of a list passed the whole suite.
+        findings = T.validate(T.Model(out), None, {}, NOW, git)
+        check(
+            "TOOL symbol decay",
+            "validate runs against a real repository, not only a git-less model",
+            isinstance(findings, list),
+        )
         check(
             "TOOL symbol decay",
             "the old ref is now unreachable, as after a squash merge",

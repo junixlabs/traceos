@@ -698,6 +698,7 @@ def validate_observation_refs(model: Model, git: Git | None) -> list[Finding]:
                 "observations/",
             )
         )
+    return findings
 
 
 def latest_observation(model: Model, assertion_id: str, reference: str | None = None):
