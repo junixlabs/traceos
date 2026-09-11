@@ -360,6 +360,31 @@ class Git:
             self._attrs_path = ""
         return self._attrs_path or None
 
+    def _note(self, path: str, anchor: str, reason: str) -> None:
+        """Why narrowing could not answer. INV-025: the boundary says what it excluded.
+
+        Three separate blockers this session were diagnosed only after a silent
+        fallback was made to speak - a gate reporting a count with no names, a
+        narrowing that cleared references without saying so, and this. A fallback
+        nobody can see is indistinguishable from a fallback that never happened.
+        """
+        if not hasattr(self, "narrow_notes"):
+            self.narrow_notes: dict[str, str] = {}
+        self.narrow_notes.setdefault(f"{path}#{anchor}", reason)
+
+    def reachable(self, ref: str) -> bool:
+        """Is this commit still in the history HEAD can see?
+
+        A squash merge replaces a branch's commits with one new commit, so every
+        `observed_ref` recorded on that branch becomes unreachable the moment it
+        lands. It survives in the author's local clone - reflog, stale branches -
+        and is gone from every fresh clone, which is why this failed only in CI and
+        only after a merge (measured: 7 of 25 refs in this repository's own log).
+        """
+        if not ref:
+            return False
+        return self._run("merge-base", "--is-ancestor", ref, "HEAD") is not None
+
     def symbol_changed_since(self, ref: str, path: str, anchor: str) -> bool | None:
         """Did the named symbol change, rather than the file that contains it?
 
@@ -378,6 +403,13 @@ class Git:
         cannot be established is not a bound that found nothing (INV-026).
         """
         if not (ref and anchor):
+            self._note(path, anchor, "no ref or no anchor recorded")
+            return None
+        if not self.reachable(ref):
+            # Unreachable is not unchanged. The caller falls back to the whole-file
+            # hash, which is loud; answering False here would silently mark every
+            # observation recorded before a squash merge as still verified.
+            self._note(path, anchor, f"observed_ref {ref[:10]} is not in this history")
             return None
         prefix = []
         attributes = self._attributes_file()
@@ -385,11 +417,18 @@ class Git:
             prefix = ["-c", f"core.attributesfile={attributes}"]
         probe = self._run(*prefix, "log", "-L", f":{anchor}:{path}", "--oneline", "-1")
         if probe is None:
+            self._note(
+                path,
+                anchor,
+                "git could not resolve the anchor "
+                + ("(attributes file unavailable)" if not attributes else "(no match)"),
+            )
             return None
         out = self._run(
             *prefix, "log", "-L", f":{anchor}:{path}", "--format=%H", "-s", f"{ref}..HEAD"
         )
         if out is None:
+            self._note(path, anchor, f"git log -L failed over {ref[:10]}..HEAD")
             return None
         return bool([line for line in out.splitlines() if line.strip()])
 
@@ -563,6 +602,48 @@ def validate_relationships(model: Model) -> list[Finding]:
     return findings
 
 
+def validate_observation_refs(model: Model, git: Git | None) -> list[Finding]:
+    """An observation whose commit no longer exists cannot be narrowed (INV-026).
+
+    Nothing is wrong with the observation - it happened. What is gone is the anchor in
+    history that decay uses to ask which symbol moved, so every reference recorded on
+    that commit falls back to whole-file staleness. Reported because the fallback is
+    otherwise invisible, and an invisible fallback is the failure INV-025 names.
+
+    Measured here: a squash merge left 7 of this repository's own 25 observed refs
+    unreachable. It reproduced only in CI, because a fresh clone has no reflog and no
+    stale branches to keep them alive - which is also why it looked like a CI quirk
+    for an hour.
+
+    The discharge is to observe again on the merged history. That is a real check, not
+    a stamp: the artifact is read at a commit that still exists.
+    """
+    if not (git and git.available):
+        return []
+    unreachable: dict[str, set[str]] = {}
+    for observation in model.observations:
+        ref = observation.get("observed_ref")
+        aid = observation.get("assertion")
+        if not ref or not aid:
+            continue
+        if not git.reachable(ref):
+            unreachable.setdefault(ref[:10], set()).add(aid)
+    findings = []
+    for ref, assertions in sorted(unreachable.items()):
+        findings.append(
+            Finding(
+                "warn",
+                "OBSERVED_REF_UNREACHABLE",
+                f"{ref} is no longer in this history - a squash merge replaces the "
+                f"commits it recorded. Decay cannot narrow to a symbol against it, so "
+                f"{len(assertions)} assertion(s) fall back to whole-file staleness: "
+                f"{', '.join(sorted(assertions))}",
+                "observations/",
+            )
+        )
+    return findings
+
+
 def validate_outcomes(model: Model) -> list[Finding]:
     """INV-015: the two symmetric findings."""
     findings = []
@@ -719,6 +800,79 @@ def stale_references(
             if changed is True:
                 stale.append(reference)
     return stale
+
+
+def changed_since_whole_file(
+    git: Git, path: str, blob: str | None, norm_blob: str | None
+) -> bool | None:
+    if not blob:
+        return None
+    current = git.blob(path)
+    if current is None:
+        return None
+    if current == blob:
+        return False
+    if norm_blob:
+        current_norm = git.normalised_blob(path)
+        if current_norm is not None and current_norm == norm_blob:
+            return False
+    return True
+
+
+def narrowed_references(model: Model, assertion_id: str, git: Git | None) -> list[str]:
+    """References whose file changed but whose cited symbol did not (INV-025).
+
+    Symbol narrowing is a boundary, so it reports what it excluded rather than going
+    quiet. Before narrowing, an under-specified locator set was rescued by accident:
+    a claim spanning two functions but citing one still decayed when its sibling
+    changed. After narrowing it does not, and the miss is silent - which is the
+    direction this project has repeatedly said is the worse one.
+
+    Measured by a peer: a claim reading "dropped never reaches markMergedOnClose"
+    cited one function, and the commit that made it true again changed a sibling in
+    the same file. Narrowing discards that commit, correctly by its own rule and
+    wrongly for the claim.
+
+    The fix is not to stop narrowing; 93% of decay events here never touched the
+    cited anchor. It is that the author now owes what the tool used to cover by
+    accident: a claim must cite every symbol whose change could falsify it (6.1).
+    This is the count that tells them when they have not.
+    """
+    if not (git and git.available):
+        return []
+    assertion = model.assertions.get(assertion_id) or {}
+    declared = [ev["locator"] for ev in assertion.get("evidence") or []]
+
+    latest: dict[str, dict] = {}
+    for observation in model.observations:
+        if observation.get("assertion") != assertion_id:
+            continue
+        reference = observation.get("reference")
+        if reference not in declared:
+            continue
+        current = latest.get(reference)
+        if current is None or observation["observed_at"] >= current["observed_at"]:
+            latest[reference] = observation
+
+    narrowed = []
+    for reference, observation in latest.items():
+        path, _, anchor = reference.partition("#")
+        if not anchor:
+            continue
+        whole = changed_since_whole_file(
+            git,
+            path,
+            observation.get("observed_blob"),
+            observation.get("observed_norm"),
+        )
+        if whole is not True:
+            continue
+        if (
+            git.symbol_changed_since(observation.get("observed_ref"), path, anchor)
+            is False
+        ):
+            narrowed.append(reference)
+    return sorted(narrowed)
 
 
 def computed_confidence(
@@ -944,6 +1098,7 @@ def validate(
     findings += validate_tiers(model)
     findings += validate_relationships(model)
     findings += validate_outcomes(model)
+    findings += validate_observation_refs(model, git)
     findings += validate_identity(model)
     findings += validate_evidence(model)
     findings += validate_confidence(model, at_time, git)
@@ -1239,9 +1394,16 @@ def decay_ratchet(
 
     changed_clean = [_norm_path(c) for c in changed]
     uncertain, touched, excluded, clean = [], [], [], []
+    narrowed: list[dict] = []
     for aid, assertion in model.assertions.items():
         locators = [ev["locator"] for ev in assertion.get("evidence") or []]
         cited = [loc for loc in locators if in_scope(_repo_path(loc, prefix))]
+        if cited and any(
+            _locator_matches(loc, path, prefix) for loc in cited for path in changed_clean
+        ):
+            cleared = narrowed_references(model, aid, git)
+            if cleared:
+                narrowed.append({"assertion": aid, "references": cleared})
         if computed_confidence(model, aid, at_time, git) != "uncertain":
             if cited:
                 clean.append(aid)
@@ -1282,6 +1444,13 @@ def decay_ratchet(
         "grew": grew,
         "undischarged": sorted(touched, key=lambda t: t["assertion"]),
         "excluded": sorted(excluded),
+        "narrowed": sorted(narrowed, key=lambda n: n["assertion"]),
+        "narrow_failures": dict(sorted(getattr(git, "narrow_notes", {}).items()))
+        if git
+        else {},
+        "stale_by_assertion": {
+            aid: stale_references(model, aid, git) for aid in sorted(uncertain)
+        },
     }
 
 
