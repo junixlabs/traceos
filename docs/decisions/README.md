@@ -1,9 +1,11 @@
 # Decision log
 
-Phase P0 of the plan: settle every semantic decision before writing the
-specification. Do not write `docs/semantic-specification.md` while an ADR is OPEN.
+Every semantic decision, settled before the specification states it. Do not write
+`docs/semantic-specification.md` while an ADR is OPEN.
 
-**14/14 ACCEPTED — P0 is closed.**
+ADRs 001–014 were Phase P0 of [the original design](../DEVELOPMENT-PLAN.md) and are
+closed. ADR-015 opens the direction recorded in [`DIRECTION.md`](../DIRECTION.md), and
+is deliberately **half accepted**: the mechanism is in, the value claim is not.
 
 | ADR | Topic | Status |
 |---|---|---|
@@ -21,6 +23,7 @@ specification. Do not write `docs/semantic-specification.md` while an ADR is OPE
 | [012](012-identity-and-stability.md) | Stable semantic ids; `supersedes` outside the graph | ACCEPTED |
 | [013](013-outcome-and-terminal-states.md) | Outcomes declared explicitly, bound to States | ACCEPTED |
 | [014](014-health-out-lifecycle-resolution.md) | Drop Health; only CURRENT resolves | ACCEPTED |
+| [015](015-intent-behavior-outcome.md) | Intent ↔ Behavior ↔ Outcome | ACCEPTED (mechanism) · value **unproven** |
 
 ## The unifying pattern
 

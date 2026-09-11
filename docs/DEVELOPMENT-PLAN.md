@@ -1,10 +1,21 @@
 # How TraceOS v0.1 was designed
 
-A record of the analysis that produced the specification, the risks that shaped it,
-and what each phase delivered. The decisions themselves live in
-[`decisions/`](decisions/README.md); this is the reasoning around them.
+> **This is history, not a plan.** It records the analysis that produced v0.1, the risks
+> that shaped it, and what each phase delivered — as it stood at v0.1, with its numbers
+> and paths of that moment. Where the project is going now is
+> [`DIRECTION.md`](DIRECTION.md); what it has done since is
+> [`../CHANGELOG.md`](../CHANGELOG.md).
+>
+> Nothing here is updated as the code moves. A design record rewritten to match today's
+> code stops being evidence of what was decided and becomes a second, worse copy of the
+> code — which is the failure this project's own first rule exists to prevent (INV-001).
 
-**Every phase is complete.** 24/24 test groups, 96/96 assertions.
+The decisions themselves live in [`decisions/`](decisions/README.md); this is the
+reasoning around them.
+
+**Every v0.1 phase was complete at v0.1:** 24/24 test groups, 96/96 assertions, 22
+invariants, the engine at `tools/traceos.py`. All four numbers have since changed, and
+the paths with them.
 
 ---
 

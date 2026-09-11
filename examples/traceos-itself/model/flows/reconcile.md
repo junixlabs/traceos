@@ -58,7 +58,7 @@ assertions:
       - { kind: configuration, locator: "traceos/schema/traceos.schema.json" }
       - { kind: documentation, locator: "skills/reconciling-reality/SKILL.md#Report Integrity" }
   - id: assert.reconcile.invariants-stay-tripled
-    claim: "an invariant drifting between the specification, the skill digest and the engine is reported"
+    claim: "an invariant drifting between the specification, the reference digest, a skill citation and the engine is reported"
     subject: integrity.invariants
     lifecycle: current
     about: [node.reconcile.integrity]
