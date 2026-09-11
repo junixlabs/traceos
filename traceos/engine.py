@@ -1392,39 +1392,6 @@ def record_identity(
 
 # ------------------------------------------------------------------- init
 
-IMPORT_PATTERNS = [
-    re.compile(r"""^\s*import\s+.*?from\s+['"]([^.'"][^'"]*)['"]""", re.M),
-    re.compile(r"""^\s*(?:import|from)\s+([a-zA-Z_][\w]*)""", re.M),
-    re.compile(r"""^\s*use\s+([A-Z][\w]*)\\""", re.M),
-]
-SOURCE_SUFFIXES = {".ts", ".tsx", ".js", ".jsx", ".py", ".php", ".go", ".rb", ".java"}
-
-
-def suggest_externals(repo: pathlib.Path, files: list[str], limit: int = 15) -> list[str]:
-    """Candidates only. An import is not an External - the test is whether you can
-    change its behavior by editing this repository (spec 3.1)."""
-    counts: dict[str, int] = {}
-    for rel in files[:2000]:
-        path = repo / rel
-        if path.suffix not in SOURCE_SUFFIXES or not path.is_file():
-            continue
-        try:
-            text = path.read_text(encoding="utf-8", errors="ignore")[:20000]
-        except OSError:
-            continue
-        for pattern in IMPORT_PATTERNS:
-            for name in pattern.findall(text):
-                root = name.split("/")[0].split(".")[0].lstrip("@")
-                if root and not root.startswith("_"):
-                    counts[root] = counts.get(root, 0) + 1
-    best: dict[str, tuple[str, int]] = {}
-    for root, count in counts.items():
-        key = root.lower()
-        if key not in best or count > best[key][1]:
-            best[key] = (root, count)
-    ranked = sorted(best.values(), key=lambda rc: -rc[1])
-    return [name for name, _ in ranked[:limit]]
-
 
 def _packaged_asset_dir(name: str) -> pathlib.Path | None:
     """Locate a repository asset the engine ships beside itself.
@@ -1490,8 +1457,6 @@ irrelevant.
 """,
     )
 
-    candidates = suggest_externals(repo, files)
-    listed = "\n".join(f"- `{c}`" for c in candidates) or "- (none detected)"
     write(
         "model/externals.md",
         f"""---
@@ -1500,12 +1465,21 @@ type: externals
 externals: []
 ---
 
-## Candidates found by scanning imports
+## What belongs here
 
-These are **candidates, not entities**. An import is not an External. Apply the
-test in spec 3.1 to each one, then add the ones that pass to `externals` above.
+Something is External if you **cannot change its behavior by editing this
+repository** (spec 3.1). The access mechanism is irrelevant: a service in a
+monorepo you control is internal, a vendored library you cannot patch is not.
 
-{listed}
+A payment provider, an email gateway, a customer, an analyst deciding something
+by hand - each is External. A framework, a utility package and the language's
+standard library are not: they are how this repository is built, not behavior
+outside it.
+
+Nothing is suggested here on purpose. Scanning imports produced a list that was
+wrong on every entry when it was measured against a real repository - the
+language's standard library, the test runner, the UI toolkit and the repository
+itself - and a wrong suggestion at step one is worse than no suggestion.
 """,
     )
 

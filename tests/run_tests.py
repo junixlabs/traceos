@@ -1012,12 +1012,20 @@ def tool_init():
             "the example flow starts at stub coverage, not complete",
             T.Model(out).flows["flow.example"]["coverage_declared"] == "stub",
         )
-        cands = T.suggest_externals(tmp, files)
+        externals = (out / "model" / "externals.md").read_text()
         check(
             "TOOL init",
-            "external candidates are deduped case-insensitively",
-            len({c.lower() for c in cands}) == len(cands),
-            str(cands),
+            "the scaffold suggests no External, because every guess was wrong",
+            "candidates" not in externals.lower() and not hasattr(T, "suggest_externals"),
+            externals[:80],
+        )
+        flat = " ".join(externals.replace("*", "").split())
+        check(
+            "TOOL init",
+            "it says what an External is instead, and what it is not",
+            "cannot change its behavior by editing this repository" in flat
+            and "standard library are not" in flat,
+            flat[:100],
         )
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
@@ -1708,6 +1716,34 @@ def tool_reflow_is_not_a_change():
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+def tool_no_startup_warning():
+    """A warning printed into a user's first command is a defect in the tool.
+
+    `python3 -m traceos.cli` emitted a RuntimeWarning because __init__ imported
+    .cli at module scope, putting it in sys.modules before -m executed it.
+    """
+    import subprocess
+
+    out = subprocess.run(
+        [sys.executable, "-m", "traceos.cli", "--help"],
+        capture_output=True,
+        text=True,
+        cwd=ROOT,
+    )
+    check(
+        "TOOL no warning",
+        "running the module prints nothing to stderr",
+        out.stderr == "",
+        out.stderr[:120],
+    )
+    check(
+        "TOOL no warning",
+        "the package still exposes main and parse_context to an embedder",
+        callable(__import__("traceos").main)
+        and __import__("traceos").parse_context(["a=1"]) == {"a": "1"},
+    )
+
+
 def tool_positive_controls():
     """INV-026 applied to the checkers themselves: zero checked is not zero wrong.
 
@@ -1912,6 +1948,7 @@ TOOLING = [
     tool_decay_ratchet,
     tool_stale_references,
     tool_positive_controls,
+    tool_no_startup_warning,
     tool_reflow_is_not_a_change,
     tool_empty_scan_is_not_a_pass,
     tool_anchor_rot,

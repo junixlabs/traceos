@@ -176,17 +176,40 @@ def main() -> int:
         files = init(repo, out, args.name or repo.name)
         rel = out.relative_to(repo) if out.is_relative_to(repo) else out
         print(f"scaffolded {out}  ({len(files)} repository files indexed)")
-        print("\nnext:")
+        print("\nnext — model one small flow first, not the important one:")
         print(
-            f"  1. edit {rel}/model/externals.md  - apply the spec 3.1 test to the "
-            f"candidates listed in the body"
+            "  1. pick a flow you already understand end to end. Three or four "
+            "steps.\n"
+            "     The most important flow is the worst first choice: it is the one "
+            "you\n"
+            "     can least afford to get wrong while still learning the vocabulary."
         )
-        print(f"  2. replace {rel}/model/flows/example.md with your most important flow")
+        print(f"  2. write it into {rel}/model/flows/example.md - rename the file too")
         print(
-            f"  3. cd {rel} && traceos validate . "
+            f"  3. name anything it talks to in {rel}/model/externals.md. External "
+            f"means\n"
+            f"     you cannot change its behavior by editing this repository - not "
+            f"'it is a\n"
+            f"     dependency'. The file says so; nothing is suggested for you."
+        )
+        print(
+            f"  4. cd {rel} && traceos validate . "
             f"--repo-files repo-files.txt --repo {repo}"
         )
-        print(f"  4. point your agent at {rel}/skills/understanding-system/SKILL.md")
+        print(
+            f"  5. record that you checked one piece of evidence:\n"
+            f"     traceos observe . --assertion <id> --reference <locator> "
+            f"--supports supports --repo {repo}"
+        )
+        print(
+            "  6. edit the file you cited, run validate again, and watch confidence "
+            "fall.\n"
+            "     That is the whole mechanism. Everything else is more of it."
+        )
+        print(
+            f"\nthen, for the rest of the system: "
+            f"{rel}/skills/understanding-system/SKILL.md"
+        )
         return 0
 
     if args.cmd == "explore":
