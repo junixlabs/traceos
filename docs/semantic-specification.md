@@ -791,6 +791,18 @@ Measured elsewhere, in a repository running a comparable layer: a freeze of 12,4
 annotations across 965 files held for as long as nothing asked *"you are already
 editing this file, so why is it still unaccounted for"*.
 
+**INV-023 answers file membership, not behavioural coverage.** A changed file maps to a
+Node when *any* assertion cites *any* symbol in it, so adding a new capability to an
+already-modelled module satisfies the gate while the behaviour it implements exists in no
+Flow. This repository did exactly that to itself in v0.2 (#51): two new layers landed in
+an engine file that was already mapped, and nothing reported that they were unmodelled.
+
+Decay does not cover the gap either, now that it is symbol-granular (§6.3.1): a symbol
+nobody cites cannot go stale. The precision that removed 93% of spurious decay also
+removed the accidental coverage a whole-file hash used to provide — the same trade as
+§6.3's, one level up. **The model now owes a declaration where the tool used to stumble
+over one.**
+
 ### 13.0.1 INV-024 DECAY-DISCHARGE
 
 Confidence falling is a **disclosure**. Two rules turn it into an obligation:
