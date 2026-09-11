@@ -791,6 +791,30 @@ four times: a scoped run that diffed a branch against itself walked zero files,
 printed its success line, and let 15 errors through a check that had examined
 nothing.
 
+### 13.0.4 What the ratchet cannot reach
+
+Measured across five unrelated private repositories — two services, two internal
+tools, one API, between 1,400 and 9,500 commits each — **churn is flat**. Over a
+40-commit window, covering 80% of file-touches takes 67–74% of the distinct files
+touched, and 70–80% of those files are touched exactly once. Widening the window to
+800 commits improves it but never produces a hot set: 44–55% of touched files are
+still needed for 80% of touches.
+
+There is no small set of files that most change passes through. That bounds INV-023
+and the bound is not small:
+
+- A scope wide enough to cover most change would require modelling most of the
+  repository, which nobody will do.
+- A scope narrow enough to be affordable gates a minority of change.
+
+**Both are honest; neither converges on covering the system.** A model that covers
+what a team most needs to be right about is the achievable goal. A model that grows
+until it gates everything is not, and the specification does not claim it.
+
+This is why `scope` is a declaration rather than a default. It states the area the
+team has chosen to hold to this standard, and its value comes from that area being
+chosen deliberately — not from the prefix eventually reaching the repository root.
+
 ### 13.1 Declared versus measured
 
 `coverage_declared: complete | partial | stub` on a Flow is an authored claim and can
