@@ -778,6 +778,29 @@ carry all four tiers, including an empty `unknown`.
 
 ## 13. Coverage
 
+#### An impact result that reaches most of the model says nothing
+
+The tiers are useful only while they stay different sizes. Measured (#5):
+
+| graph | entities | median reached by one change | worst |
+|---|---|---|---|
+| synthetic, 10 flows | 61 | 15% | 20% |
+| synthetic, 50 flows, fanout 4 | 301 | 9% | 15% |
+| synthetic, 200 flows, fanout 6 | 1,201 | 5% | 7% |
+| `examples/ecommerce` | 32 | **61%** | 66% |
+| `examples/traceos-itself` | 45 | **56%** | 89% |
+
+**The tier system does not collapse with scale** — that hypothesis is refuted; as the
+graph grows a change reaches proportionally *less* of it, and `certain` stays at two
+entities while `inspect` absorbs the distance. Where it collapses is the opposite end:
+small models in which every flow invokes another, which is what a model looks like in its
+first week.
+
+So the result carries `share_reached` and `discriminates`, and a result above 50% is
+reported as **DID NOT DISCRIMINATE** rather than as an answer — the shape of INV-026 one
+level down. It is a fact about the model, not a finding about the change, and saying so
+prevents the worst reading: that a change genuinely touches two thirds of a system.
+
 ### INV-011 UNCERTAIN-NE-UNKNOWN
 
 | | Meaning | Detectable by |

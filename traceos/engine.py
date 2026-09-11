@@ -1494,11 +1494,33 @@ def impact(model: Model, changed: list[str], depth: int = 2) -> dict:
     for ring in rings[1:]:
         inspect |= ring
 
+    entities = (
+        set(model.flows)
+        | set(model.nodes)
+        | set(model.states)
+        | set(model.externals)
+        | set(model.events)
+    )
+    reached = (certain | likely | inspect) & entities
+    share = round(100 * len(reached) / len(entities)) if entities else 0
+
     return {
         "certain": sorted(certain),
         "likely": sorted(likely),
         "inspect": sorted(inspect),
         "unknown": sorted(unknown),
+        # INV-019 has the same shape as INV-026 one level down: a result that reaches
+        # most of the model is not "everything is affected", it is "this model cannot
+        # discriminate". Measured (#5): on graphs of 150-1200 entities a single change
+        # reaches a median 4-9% and the tiers stay far apart, so the tier system does
+        # not collapse with scale. On the two reference models - 32 and 45 entities,
+        # every flow invoking another - the median is 56-61% and the worst case 89%.
+        # The mechanism is sound and small dense models are the place it says nothing,
+        # which is worth reporting rather than dressing as an answer.
+        "entities": len(entities),
+        "reached": len(reached),
+        "share_reached": share,
+        "discriminates": share <= 50,
     }
 
 

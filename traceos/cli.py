@@ -340,6 +340,17 @@ def main() -> int:
                 print(f"{tier}:")
                 for item in result[tier]:
                     print(f"  {item}")
+            print(
+                f"\nreached {result['reached']} of {result['entities']} modelled "
+                f"entities ({result['share_reached']}%)"
+            )
+            if not result["discriminates"]:
+                print(
+                    "  DID NOT DISCRIMINATE  this change reaches most of the model, so "
+                    "the tiers\n  are not telling you where to look. Usually the model "
+                    "is small or every\n  flow invokes another; it is not a finding "
+                    "about the change."
+                )
         return 0
 
     if args.cmd == "ratchet":

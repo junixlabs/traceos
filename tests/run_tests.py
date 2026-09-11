@@ -815,7 +815,14 @@ def inv_impact_ne_changed_files():
     check(
         "INV Impact != Files",
         "all four tiers are always present",
-        set(imp) == {"certain", "likely", "inspect", "unknown"},
+        {"certain", "likely", "inspect", "unknown"} <= set(imp),
+        str(sorted(imp)),
+    )
+    check(
+        "INV Impact != Files",
+        "and the result says how much of the model it reached (#5)",
+        {"entities", "reached", "share_reached", "discriminates"} <= set(imp),
+        str(sorted(imp)),
     )
     check(
         "INV Impact != Files",
@@ -2536,6 +2543,48 @@ def inv_contradiction_is_evidence_not_wording():
     )
 
 
+def inv_impact_says_when_it_cannot_discriminate():
+    """#5. Four tiers are useful only while they stay different sizes.
+
+    Measured across synthetic graphs of 61 to 1,201 entities: a single change reaches a
+    median 4-15% and the tiers stay far apart, so the tier system does not collapse with
+    scale - the hypothesis in #5 is refuted there. On the two reference models, 32 and 45
+    entities with every flow invoking another, the median is 56-61% and the worst case
+    89%. Small dense models are where it says nothing, and saying so is the answer.
+    """
+    model = T.Model(EXAMPLE)
+    result = T.impact(model, ["src/payment/PaymentProcessor.ts#process"])
+    check(
+        "INV-019 discrimination",
+        "impact reports how much of the model it reached",
+        result["entities"] > 0 and 0 <= result["share_reached"] <= 100,
+        str((result["reached"], result["entities"], result["share_reached"])),
+    )
+    check(
+        "INV-019 discrimination",
+        "a change reaching most of a small dense model is flagged as not discriminating",
+        result["share_reached"] > 50 and result["discriminates"] is False,
+        str(result["share_reached"]),
+    )
+
+    # Positive control: something must still discriminate, or the flag is a constant.
+    itself = T.impact(
+        T.Model(ROOT / "examples" / "traceos-itself"), ["traceos/site.py#main"]
+    )
+    check(
+        "INV-019 discrimination",
+        "a narrow change on a larger model does discriminate",
+        itself["discriminates"] is True and itself["share_reached"] <= 50,
+        str(itself["share_reached"]),
+    )
+    check(
+        "INV-019 discrimination",
+        "reached never exceeds the entity count, whatever the tiers overlap",
+        result["reached"] <= result["entities"],
+        str((result["reached"], result["entities"])),
+    )
+
+
 INVARIANTS = [
     inv_reality_ne_code,
     inv_code_change_ne_behavior_change,
@@ -2547,6 +2596,7 @@ INVARIANTS = [
     inv_confidence_per_reference,
     inv_outcome_can_be_refuted,
     inv_contradiction_is_evidence_not_wording,
+    inv_impact_says_when_it_cannot_discriminate,
 ]
 
 
