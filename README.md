@@ -117,7 +117,7 @@ confidence and is reported — unverifiable is not the same as verified.
 ## Layout
 
 ```
-docs/semantic-specification.md   the definition — 22 numbered invariants
+docs/semantic-specification.md   the definition — 25 numbered invariants
 docs/decisions/                  14 ADRs — why each rule exists
 traceos/schema/traceos.schema.json  frontmatter structure
 examples/ecommerce/              reference model touching every entity
@@ -128,7 +128,7 @@ traceos/explore.py               the HTML view
 traceos/site.py                  the Pages site, built from the models
 traceos/cli.py                   command line: init, observe, validate, resolve,
                                  impact, diff, coverage, explore
-tests/run_tests.py               13 stress cases, 7 invariants, 4 tooling groups
+tests/run_tests.py               13 stress cases, 8 invariants, 10 tooling groups
 ```
 
 ## Status

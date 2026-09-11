@@ -19,7 +19,7 @@ new check, go straight to a pull request.
 ```bash
 pip install pyyaml jsonschema ruff .
 
-python3 tests/run_tests.py -v                    # 13 cases, 7 invariants, 4 tooling groups
+python3 tests/run_tests.py -v                    # 13 cases, 8 invariants, 10 tooling groups
 python3 -m traceos.check_docs                    # invariants defined, cited, enforced
 python3 -m traceos.check_locators examples/traceos-itself
 ruff check traceos tests && ruff format traceos tests
@@ -29,7 +29,7 @@ CI runs the same four, on Python 3.11, 3.12 and 3.13.
 
 ## Rules a change has to keep
 
-The specification carries 22 numbered invariants, digested for agents in
+The specification carries 25 numbered invariants, digested for agents in
 [`skills/reference/`](skills/reference/README.md). Two of them catch most mistakes:
 
 - **Nothing derivable is authored** (INV-001). Confidence, Coverage, Impact and
