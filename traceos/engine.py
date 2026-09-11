@@ -360,6 +360,19 @@ class Git:
             self._attrs_path = ""
         return self._attrs_path or None
 
+    def reachable(self, ref: str) -> bool:
+        """Is this commit still in the history HEAD can see?
+
+        A squash merge replaces a branch's commits with one new commit, so every
+        `observed_ref` recorded on that branch becomes unreachable the moment it
+        lands. It survives in the author's local clone - reflog, stale branches -
+        and is gone from every fresh clone, which is why this failed only in CI and
+        only after a merge (measured: 7 of 25 refs in this repository's own log).
+        """
+        if not ref:
+            return False
+        return self._run("merge-base", "--is-ancestor", ref, "HEAD") is not None
+
     def symbol_changed_since(self, ref: str, path: str, anchor: str) -> bool | None:
         """Did the named symbol change, rather than the file that contains it?
 
@@ -378,6 +391,11 @@ class Git:
         cannot be established is not a bound that found nothing (INV-026).
         """
         if not (ref and anchor):
+            return None
+        if not self.reachable(ref):
+            # Unreachable is not unchanged. The caller falls back to the whole-file
+            # hash, which is loud; answering False here would silently mark every
+            # observation recorded before a squash merge as still verified.
             return None
         prefix = []
         attributes = self._attributes_file()
@@ -560,6 +578,48 @@ def validate_relationships(model: Model) -> list[Finding]:
                     where,
                 )
             )
+    return findings
+
+
+def validate_observation_refs(model: Model, git: Git | None) -> list[Finding]:
+    """An observation whose commit no longer exists cannot be narrowed (INV-026).
+
+    Nothing is wrong with the observation - it happened. What is gone is the anchor in
+    history that decay uses to ask which symbol moved, so every reference recorded on
+    that commit falls back to whole-file staleness. Reported because the fallback is
+    otherwise invisible, and an invisible fallback is the failure INV-025 names.
+
+    Measured here: a squash merge left 7 of this repository's own 25 observed refs
+    unreachable. It reproduced only in CI, because a fresh clone has no reflog and no
+    stale branches to keep them alive - which is also why it looked like a CI quirk
+    for an hour.
+
+    The discharge is to observe again on the merged history. That is a real check, not
+    a stamp: the artifact is read at a commit that still exists.
+    """
+    if not (git and git.available):
+        return []
+    unreachable: dict[str, set[str]] = {}
+    for observation in model.observations:
+        ref = observation.get("observed_ref")
+        aid = observation.get("assertion")
+        if not ref or not aid:
+            continue
+        if not git.reachable(ref):
+            unreachable.setdefault(ref[:10], set()).add(aid)
+    findings = []
+    for ref, assertions in sorted(unreachable.items()):
+        findings.append(
+            Finding(
+                "warn",
+                "OBSERVED_REF_UNREACHABLE",
+                f"{ref} is no longer in this history - a squash merge replaces the "
+                f"commits it recorded. Decay cannot narrow to a symbol against it, so "
+                f"{len(assertions)} assertion(s) fall back to whole-file staleness: "
+                f"{', '.join(sorted(assertions))}",
+                "observations/",
+            )
+        )
     return findings
 
 
@@ -1017,6 +1077,7 @@ def validate(
     findings += validate_tiers(model)
     findings += validate_relationships(model)
     findings += validate_outcomes(model)
+    findings += validate_observation_refs(model, git)
     findings += validate_identity(model)
     findings += validate_evidence(model)
     findings += validate_confidence(model, at_time, git)
