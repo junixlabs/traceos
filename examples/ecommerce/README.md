@@ -36,12 +36,12 @@ repo-files.txt          the repository file list coverage needs as input
 ## Run it
 
 ```bash
-python3 ../../tools/traceos.py validate . --repo-files repo-files.txt
-python3 ../../tools/traceos.py resolve  . --context tenant=a
-python3 ../../tools/traceos.py resolve  . --context tenant=b
-python3 ../../tools/traceos.py impact   . --changed "src/payment/GatewayResolver.ts#resolve"
-python3 ../../tools/traceos.py impact   . --changed "external.stripe"
-python3 ../../tools/traceos.py coverage . --repo-files repo-files.txt
+traceos validate . --repo-files repo-files.txt
+traceos resolve  . --context tenant=a
+traceos resolve  . --context tenant=b
+traceos impact   . --changed "src/payment/GatewayResolver.ts#resolve"
+traceos impact   . --changed "external.stripe"
+traceos coverage . --repo-files repo-files.txt
 ```
 
 ## The warnings and the gaps are deliberate

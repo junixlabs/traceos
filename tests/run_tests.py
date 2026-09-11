@@ -20,7 +20,7 @@ import tempfile
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent))
 import yaml
 
-import traceos as cli
+from traceos import cli
 from traceos import engine as T
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
