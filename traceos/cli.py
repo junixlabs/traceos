@@ -376,8 +376,43 @@ def main() -> int:
                     f"  ({len(decay['excluded'])} uncertain outside the decay scope: "
                     f"{', '.join(decay['excluded'])})"
                 )
+            if decay["narrowed"]:
+                refs = sum(len(n["references"]) for n in decay["narrowed"])
+                print(
+                    f"  NARROWED  {refs} reference(s) on "
+                    f"{len(decay['narrowed'])} assertion(s) were cleared because the "
+                    f"file changed and the cited symbol did not."
+                )
+                for item in decay["narrowed"]:
+                    print(
+                        f"            {item['assertion']}: "
+                        f"{', '.join(item['references'])}"
+                    )
+                print(
+                    "            Not a failure. Reported because narrowing is a "
+                    "boundary (INV-025):\n"
+                    "            a claim whose logic spans a symbol it does not cite "
+                    "used to be rescued\n"
+                    "            by file granularity and now is not. Cite every symbol "
+                    "whose change\n            could falsify the claim."
+                )
             if decay["grew"]:
                 print("  GREW      the uncertain count is above the baseline")
+                # INV-025. A count with no names is silence wearing a number: the
+                # reader cannot act on it, and two machines disagreeing about the
+                # count cannot be compared. Naming them is what made a CI-only
+                # failure reproducible at all.
+                for aid in decay["uncertain"]:
+                    stale = decay.get("stale_by_assertion", {}).get(aid) or []
+                    why = (
+                        "stale: " + ", ".join(stale)
+                        if stale
+                        else "no reference is stale - uncertain for another reason "
+                        "(never observed, or past the staleness window)"
+                    )
+                    print(f"            {aid}: {why}")
+                for ref, reason in decay.get("narrow_failures", {}).items():
+                    print(f"  NO NARROW {ref}: {reason}")
             for item in decay["undischarged"]:
                 print(
                     f"  UNDISCHARGED  {item['assertion']} is uncertain and cites "
