@@ -1115,6 +1115,19 @@ the moment it was read. The line range is derived from git's own hunk header at 
 time and never stored, so INV-022 is untouched; what is stored is a hash of what the
 observer actually read, which is what an observation is for.
 
+The range is resolved with `git blame -L :<symbol> <file>`, which answers **at HEAD**.
+`git log -L` was tried first and is wrong for this: its hunk header reports the range as
+it stood at the last commit that touched the symbol, so any later commit editing the file
+above it shifts the answer — measured here, a 111-line insertion moved a function from
+line 717 to 747 and the hash was taken over the wrong 68 lines.
+
+Trailing blank lines are dropped before hashing, for the same reason `observed_norm`
+drops them: git's funcname block includes the blank lines that follow a symbol, so
+inserting a new function *after* one otherwise reads as an edit *to* it.
+
+Both were false positives in the safe direction. Both were still wrong, and a checker that
+cries wolf is discharged by rubber stamp (§13.0.1).
+
 Order of answers, strongest first:
 
 | | Needs history | Answers |

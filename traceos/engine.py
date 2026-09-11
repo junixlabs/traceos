@@ -443,7 +443,11 @@ class Git:
             lines = target.read_text(encoding="utf-8", errors="replace").splitlines()
         except OSError:
             return None
-        body = "\n".join(line.rstrip() for line in lines[lo - 1 : hi])
+        # Trailing blank lines are dropped for the same reason `normalised_blob` drops
+        # them: no language gives them meaning, and git's funcname block includes the
+        # blank lines after a symbol - so inserting a new function *after* this one
+        # otherwise reads as an edit *to* it. Safe-direction noise, and still noise.
+        body = "\n".join(line.rstrip() for line in lines[lo - 1 : hi]).rstrip("\n")
         if not body.strip():
             return None
         return hashlib.sha1(body.encode("utf-8")).hexdigest()

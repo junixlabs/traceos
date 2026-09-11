@@ -1308,6 +1308,7 @@ def tool_symbol_decay():
         # being rewritten, because a squash merge does exactly that. Measured on this
         # repository, one squash orphaned 7 of 25 observed refs.
         sym_before = git.symbol_blob("mod.py", "alpha")
+        sym_beta = git.symbol_blob("mod.py", "beta")
         run("checkout", "-q", "--orphan", "rewritten")
         run("add", "-A")
         run("commit", "-qm", "history rewritten, every old commit orphaned")
@@ -1323,6 +1324,24 @@ def tool_symbol_decay():
             "TOOL symbol decay",
             "the old ref is now unreachable, as after a squash merge",
             git.reachable(head) is False,
+        )
+        # git's funcname block includes the blank lines after a symbol, so inserting a
+        # new function *after* this one read as an edit *to* it until trailing blanks
+        # were dropped. Safe-direction noise, measured on this repository's own suite.
+        src.write_text(src.read_text() + "\n\ndef gamma():\n    return 3\n")
+        run("add", "mod.py")
+        run("commit", "-qm", "a new function after alpha and beta")
+        check(
+            "TOOL symbol decay",
+            "adding a function after a symbol is not an edit to it",
+            git.symbol_blob("mod.py", "beta") == sym_beta,
+            f"{git.symbol_blob('mod.py', 'beta')} vs {sym_beta}",
+        )
+        check(
+            "TOOL symbol decay",
+            "and the range still resolves at HEAD, not at the last commit",
+            git.symbol_range("mod.py", "gamma")[0] is not None,
+            str(git.symbol_range("mod.py", "gamma")),
         )
         check(
             "TOOL symbol decay",
