@@ -272,19 +272,34 @@ A reference is a pointer; by itself it cannot say whether it still supports the
 claim. An observation is a fact about a moment and remains true forever as a
 statement about that moment.
 
-#### 6.2.1 A claim copied out of a record inherits staleness the record never had
+#### 6.2.1 Only a frozen statement is a record; everything else is a claim
 
-A **record** — an observation, a changelog entry, a release note — is true about
-its moment and never becomes wrong. A **claim** is about now, and can. Those are
-different objects and the obligation to re-verify belongs only to the second.
+A **record** is true about its moment and never becomes wrong. A **claim** is about
+now, and can. The obligation to re-verify belongs only to the second.
 
-The failure this creates is quiet and worth naming. Prose written *from* a record
-turns a historical statement into a present-tense one, and the record cannot warn
-anyone: it was never wrong. The copy is wrong, the original is not, and nothing
+**What makes a statement a record is that it was frozen — released, tagged,
+published, shipped — not what kind of file it lives in.** A changelog entry, a
+release note and a design document are records once published and claims before
+that. An unreleased section is a *draft* of a record: mutable, and expected to be
+true when it is promoted rather than on the day each paragraph was typed. A stale
+sentence sitting there has the form that invites an exemption and none of the
+properties that justify one.
+
+Measured in an unrelated repository: a changelog of 4,543 lines carried exactly one
+section heading — `[Unreleased]` — with no released sections and the last version
+tag three months old. Categorising by file would have exempted all of it.
+
+An Evidence Observation is the clean case, and it is clean by construction: it is
+append-only, immutable and stamped with the moment it was taken, so it is frozen at
+the instant it exists. That is what earns it the RECORDED tier.
+
+The failure this creates is quiet and worth naming. Prose written *from* a frozen
+record turns a historical statement into a present-tense one, and the record cannot
+warn anyone: it was never wrong. The copy is wrong, the original is not, and nothing
 connects them.
 
-Measured in an unrelated repository: a changelog entry accurately described a rule
-as of the day it was written. A later change reversed that rule and three source
+Measured in the same repository: a changelog entry accurately described a rule as of
+the day it was written. A later change reversed that rule and three source
 annotations were updated to match. The changelog was not — correctly, since it
 records what shipped — but a flow page had been written from it, and that page now
 told readers the reversed rule was current. **Every identifier in the sentence still
