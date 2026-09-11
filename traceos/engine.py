@@ -1363,6 +1363,9 @@ def decay_ratchet(
         "undischarged": sorted(touched, key=lambda t: t["assertion"]),
         "excluded": sorted(excluded),
         "narrowed": sorted(narrowed, key=lambda n: n["assertion"]),
+        "stale_by_assertion": {
+            aid: stale_references(model, aid, git) for aid in sorted(uncertain)
+        },
     }
 
 

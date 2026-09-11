@@ -398,6 +398,19 @@ def main() -> int:
                 )
             if decay["grew"]:
                 print("  GREW      the uncertain count is above the baseline")
+                # INV-025. A count with no names is silence wearing a number: the
+                # reader cannot act on it, and two machines disagreeing about the
+                # count cannot be compared. Naming them is what made a CI-only
+                # failure reproducible at all.
+                for aid in decay["uncertain"]:
+                    stale = decay.get("stale_by_assertion", {}).get(aid) or []
+                    why = (
+                        "stale: " + ", ".join(stale)
+                        if stale
+                        else "no reference is stale - uncertain for another reason "
+                        "(never observed, or past the staleness window)"
+                    )
+                    print(f"            {aid}: {why}")
             for item in decay["undischarged"]:
                 print(
                     f"  UNDISCHARGED  {item['assertion']} is uncertain and cites "
