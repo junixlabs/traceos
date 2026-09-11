@@ -2446,6 +2446,96 @@ def inv_outcome_can_be_refuted():
     )
 
 
+def inv_contradiction_is_evidence_not_wording():
+    """INV-008. A contradiction between two sentences is not mechanically decidable.
+
+    The original check called every pair of differently-worded assertions on one subject
+    a contradiction. Measured on an outsider's first run: five assertions on one subject
+    produced ten errors and an INVALID model, with nothing actually in conflict. Nothing
+    in this system reads a claim, so "different string" was standing in for "incompatible
+    proposition".
+    """
+    flow = {
+        "id": "flow.x",
+        "type": "flow",
+        "domain": "d",
+        "lifecycle": "current",
+        "coverage_declared": "stub",
+        "trigger": {"kind": "user_action", "actor": "external.someone"},
+        "nodes": [{"id": "node.x.s", "type": "action", "name": "S"}],
+        "assertions": [
+            {
+                "id": f"assert.x.a{i}",
+                "claim": f"aspect {i} of the thing",
+                "subject": "x.thing",
+                "lifecycle": "current",
+                "about": ["node.x.s"],
+                "evidence": [{"kind": "implementation", "locator": f"src/a{i}.ts#f"}],
+            }
+            for i in range(5)
+        ],
+    }
+    externals = {
+        "id": "system.x.externals",
+        "type": "externals",
+        "externals": [{"id": "external.someone", "name": "Someone"}],
+    }
+
+    model = scratch_model({"f": flow, "e": externals})
+    findings = T.validate(model, None, {}, NOW)
+    smell = [f for f in findings if f.code == "SUBJECT_NOT_DISCRIMINATING"]
+    check(
+        "INV-008 contradiction",
+        "five assertions on one subject raise one finding, not ten",
+        len(smell) == 1,
+        str(len(smell)),
+    )
+    check(
+        "INV-008 contradiction",
+        "wording alone is not an error, and does not make the model INVALID",
+        not [f for f in findings if f.level == "error"]
+        and T.integrity(findings, {}, None) != "INVALID",
+        str(sorted(codes(findings))),
+    )
+
+    # Positive control. Evidence that disagrees IS a contradiction, and must stay an
+    # error - otherwise this fix has traded a false alarm for a silence.
+    model = scratch_model({"f": flow, "e": externals})
+    model.observations.append(
+        {
+            "assertion": "assert.x.a0",
+            "reference": "src/a0.ts#f",
+            "observed_at": stamp(1),
+            "supports": "supports",
+            "observer": "agent",
+        }
+    )
+    model.observations.append(
+        {
+            "assertion": "assert.x.a1",
+            "reference": "src/a1.ts#f",
+            "observed_at": stamp(1),
+            "supports": "refutes",
+            "observer": "agent",
+        }
+    )
+    findings = T.validate(model, None, {}, NOW)
+    real = [f for f in findings if f.code == "CONTRADICTION"]
+    check(
+        "INV-008 contradiction",
+        "evidence pointing opposite ways on one subject is still an error",
+        len(real) == 1 and real[0].level == "error",
+        str([f.message for f in real]),
+    )
+    check(
+        "INV-008 contradiction",
+        "and it names which side is supported and which refuted",
+        "assert.x.a0 is supported" in real[0].message
+        and "assert.x.a1 is refuted" in real[0].message,
+        real[0].message if real else "",
+    )
+
+
 INVARIANTS = [
     inv_reality_ne_code,
     inv_code_change_ne_behavior_change,
@@ -2456,6 +2546,7 @@ INVARIANTS = [
     inv_evidence_ne_assertion,
     inv_confidence_per_reference,
     inv_outcome_can_be_refuted,
+    inv_contradiction_is_evidence_not_wording,
 ]
 
 

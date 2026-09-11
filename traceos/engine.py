@@ -544,6 +544,34 @@ def selectors_overlap(a: dict | None, b: dict | None) -> bool:
 # ---------------------------------------------------------------- validation
 
 
+ID_HINT = (
+    "ids use hyphens and keys use underscores: `flow.my-flow`, not `flow.my_flow`, "
+    "beside `coverage_declared` and `transitions_to`. Both rules are deliberate and "
+    "the combination is not guessable, so it is said here rather than left to a regex."
+)
+
+
+def explain_schema_error(err) -> str:
+    """A regex is a specification, not an explanation.
+
+    Measured on the first outside run of this tool: the author read the snake_case keys,
+    applied one substitution to make the ids match, and broke every keyword instead -
+    22 errors from a message that was technically complete and practically unusable.
+    """
+    message = err.message
+    if "does not match" in message and "[a-z0-9-]" in message:
+        return f"{message.split(' does not match')[0]} is not a valid id. {ID_HINT}"
+    if err.validator == "additionalProperties":
+        return (
+            f"{message} A model document carries only the keys this entity type "
+            f"declares; an unexpected one is usually a typo or a field from another "
+            f"type."
+        )
+    if err.validator == "enum" and "type" in str(err.path):
+        return f"{message} Document types are set by the `type:` key in frontmatter."
+    return message
+
+
 def validate_schema(model: Model) -> list[Finding]:
     if jsonschema is None:
         return [Finding("warn", "SCHEMA_SKIPPED", "jsonschema not installed")]
@@ -554,7 +582,9 @@ def validate_schema(model: Model) -> list[Finding]:
         where = str(path.relative_to(model.root))
         for err in sorted(validator.iter_errors(doc), key=lambda e: list(e.path)):
             loc = "/".join(str(p) for p in err.path) or "(root)"
-            findings.append(Finding("error", "SCHEMA", f"{loc}: {err.message}", where))
+            findings.append(
+                Finding("error", "SCHEMA", f"{loc}: {explain_schema_error(err)}", where)
+            )
     return findings
 
 
@@ -1257,7 +1287,24 @@ def validate_confidence(
 
 
 def validate_contradictions(model: Model, context: dict) -> list[Finding]:
-    """INV-008 / §7.1: same subject, overlapping selectors, different claims."""
+    """INV-008 / §7.1. Two findings, because two different things were conflated.
+
+    The original check flagged every pair of current assertions on one subject whose
+    claim strings differed and whose selectors overlapped. Nothing reads a claim, so
+    "different string" stood in for "incompatible proposition" - and five assertions on
+    one subject produced ten errors and an INVALID model on an outsider's first run.
+
+    A contradiction between two sentences is not mechanically decidable; saying it is
+    was the error. What *is* decidable:
+
+    - their observations disagree - one is supported, the other refuted. That is a real
+      contradiction, reported per pair, because each pair is a distinct conflict a
+      person has to resolve.
+    - a subject carries several current assertions with overlapping selectors and
+      different wording. That is a subject not discriminating between them, which is a
+      modelling smell rather than an error, and it is reported **once per subject** -
+      the count of pairs was never information, only arithmetic.
+    """
     findings = []
     by_subject: dict[str, list[dict]] = {}
     for aid, assertion in model.assertions.items():
@@ -1267,21 +1314,47 @@ def validate_contradictions(model: Model, context: dict) -> list[Finding]:
             continue
         by_subject.setdefault(assertion["subject"], []).append({**assertion, "_id": aid})
 
-    for subject, group in by_subject.items():
-        for i, a in enumerate(group):
-            for b in group[i + 1 :]:
-                if a["claim"] == b["claim"]:
-                    continue
-                if selectors_overlap(a.get("when"), b.get("when")):
-                    findings.append(
-                        Finding(
-                            "error",
-                            "CONTRADICTION",
-                            f"subject '{subject}': {a['_id']} and {b['_id']} make "
-                            f"different claims under overlapping selectors",
-                            a["_where"],
-                        )
+    def direction(aid: str) -> str | None:
+        latest = latest_observation(model, aid)
+        return latest.get("supports") if latest else None
+
+    for subject, group in sorted(by_subject.items()):
+        overlapping = [
+            (a, b)
+            for i, a in enumerate(group)
+            for b in group[i + 1 :]
+            if a["claim"] != b["claim"]
+            and selectors_overlap(a.get("when"), b.get("when"))
+        ]
+        if not overlapping:
+            continue
+        for a, b in overlapping:
+            da, db = direction(a["_id"]), direction(b["_id"])
+            if {da, db} == {"supports", "refutes"}:
+                supported = a if da == "supports" else b
+                refuted = b if da == "supports" else a
+                findings.append(
+                    Finding(
+                        "error",
+                        "CONTRADICTION",
+                        f"subject '{subject}': {supported['_id']} is supported and "
+                        f"{refuted['_id']} is refuted under overlapping selectors. "
+                        f"Evidence disagrees - this is not a wording difference",
+                        a["_where"],
                     )
+                )
+        ids = sorted({a["_id"] for pair in overlapping for a in pair})
+        findings.append(
+            Finding(
+                "warn",
+                "SUBJECT_NOT_DISCRIMINATING",
+                f"subject '{subject}' carries {len(ids)} current assertions with "
+                f"overlapping selectors and different claims: {', '.join(ids)}. If they "
+                f"describe different aspects, give them different subjects; if they "
+                f"compete, separate them with `when` selectors (INV-008)",
+                group[0]["_where"],
+            )
+        )
     return findings
 
 

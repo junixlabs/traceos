@@ -515,6 +515,26 @@ behavior and is valid.
 
 ## 8. Lifecycle and Effective Reality
 
+
+#### Wording is not a contradiction
+
+Nothing in this system reads a claim (§6.1), so "the strings differ" cannot mean "the
+propositions conflict". Treating it that way produced ten errors and an INVALID model
+from five assertions on one subject on the first outside run of this tool, with nothing
+actually in conflict.
+
+Two findings, because two different things were being conflated:
+
+| Finding | Level | Condition |
+|---|---|---|
+| `CONTRADICTION` | error | same subject, overlapping selectors, and the **latest observations disagree** — one supported, one refuted |
+| `SUBJECT_NOT_DISCRIMINATING` | warn | same subject, overlapping selectors, different wording — reported **once per subject** |
+
+The first is decidable and is a real conflict a person must resolve, so it is reported
+per pair. The second is a modelling smell: either the assertions describe different
+aspects and want different subjects, or they compete and want `when` selectors. The
+count of pairs was never information, only arithmetic.
+
 ### INV-016 CURRENT-ONLY-RESOLVES
 
 ```
