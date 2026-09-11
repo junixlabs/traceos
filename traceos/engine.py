@@ -721,6 +721,79 @@ def stale_references(
     return stale
 
 
+def changed_since_whole_file(
+    git: Git, path: str, blob: str | None, norm_blob: str | None
+) -> bool | None:
+    if not blob:
+        return None
+    current = git.blob(path)
+    if current is None:
+        return None
+    if current == blob:
+        return False
+    if norm_blob:
+        current_norm = git.normalised_blob(path)
+        if current_norm is not None and current_norm == norm_blob:
+            return False
+    return True
+
+
+def narrowed_references(model: Model, assertion_id: str, git: Git | None) -> list[str]:
+    """References whose file changed but whose cited symbol did not (INV-025).
+
+    Symbol narrowing is a boundary, so it reports what it excluded rather than going
+    quiet. Before narrowing, an under-specified locator set was rescued by accident:
+    a claim spanning two functions but citing one still decayed when its sibling
+    changed. After narrowing it does not, and the miss is silent - which is the
+    direction this project has repeatedly said is the worse one.
+
+    Measured by a peer: a claim reading "dropped never reaches markMergedOnClose"
+    cited one function, and the commit that made it true again changed a sibling in
+    the same file. Narrowing discards that commit, correctly by its own rule and
+    wrongly for the claim.
+
+    The fix is not to stop narrowing; 93% of decay events here never touched the
+    cited anchor. It is that the author now owes what the tool used to cover by
+    accident: a claim must cite every symbol whose change could falsify it (6.1).
+    This is the count that tells them when they have not.
+    """
+    if not (git and git.available):
+        return []
+    assertion = model.assertions.get(assertion_id) or {}
+    declared = [ev["locator"] for ev in assertion.get("evidence") or []]
+
+    latest: dict[str, dict] = {}
+    for observation in model.observations:
+        if observation.get("assertion") != assertion_id:
+            continue
+        reference = observation.get("reference")
+        if reference not in declared:
+            continue
+        current = latest.get(reference)
+        if current is None or observation["observed_at"] >= current["observed_at"]:
+            latest[reference] = observation
+
+    narrowed = []
+    for reference, observation in latest.items():
+        path, _, anchor = reference.partition("#")
+        if not anchor:
+            continue
+        whole = changed_since_whole_file(
+            git,
+            path,
+            observation.get("observed_blob"),
+            observation.get("observed_norm"),
+        )
+        if whole is not True:
+            continue
+        if (
+            git.symbol_changed_since(observation.get("observed_ref"), path, anchor)
+            is False
+        ):
+            narrowed.append(reference)
+    return sorted(narrowed)
+
+
 def computed_confidence(
     model: Model, assertion_id: str, at_time: dt.datetime, git: Git | None = None
 ) -> str:
@@ -1239,9 +1312,16 @@ def decay_ratchet(
 
     changed_clean = [_norm_path(c) for c in changed]
     uncertain, touched, excluded, clean = [], [], [], []
+    narrowed: list[dict] = []
     for aid, assertion in model.assertions.items():
         locators = [ev["locator"] for ev in assertion.get("evidence") or []]
         cited = [loc for loc in locators if in_scope(_repo_path(loc, prefix))]
+        if cited and any(
+            _locator_matches(loc, path, prefix) for loc in cited for path in changed_clean
+        ):
+            cleared = narrowed_references(model, aid, git)
+            if cleared:
+                narrowed.append({"assertion": aid, "references": cleared})
         if computed_confidence(model, aid, at_time, git) != "uncertain":
             if cited:
                 clean.append(aid)
@@ -1282,6 +1362,7 @@ def decay_ratchet(
         "grew": grew,
         "undischarged": sorted(touched, key=lambda t: t["assertion"]),
         "excluded": sorted(excluded),
+        "narrowed": sorted(narrowed, key=lambda n: n["assertion"]),
     }
 
 

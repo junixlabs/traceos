@@ -376,6 +376,26 @@ def main() -> int:
                     f"  ({len(decay['excluded'])} uncertain outside the decay scope: "
                     f"{', '.join(decay['excluded'])})"
                 )
+            if decay["narrowed"]:
+                refs = sum(len(n["references"]) for n in decay["narrowed"])
+                print(
+                    f"  NARROWED  {refs} reference(s) on "
+                    f"{len(decay['narrowed'])} assertion(s) were cleared because the "
+                    f"file changed and the cited symbol did not."
+                )
+                for item in decay["narrowed"]:
+                    print(
+                        f"            {item['assertion']}: "
+                        f"{', '.join(item['references'])}"
+                    )
+                print(
+                    "            Not a failure. Reported because narrowing is a "
+                    "boundary (INV-025):\n"
+                    "            a claim whose logic spans a symbol it does not cite "
+                    "used to be rescued\n"
+                    "            by file granularity and now is not. Cite every symbol "
+                    "whose change\n            could falsify the claim."
+                )
             if decay["grew"]:
                 print("  GREW      the uncertain count is above the baseline")
             for item in decay["undischarged"]:

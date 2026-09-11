@@ -1255,6 +1255,47 @@ def tool_symbol_decay():
             "an anchor git cannot resolve falls back, it does not report clean",
             git.changed_since(head, "mod.py", blob, None, "no_such_symbol") is True,
         )
+
+        # INV-025. Narrowing is a boundary, so what it excluded has to be visible:
+        # before it existed, a claim spanning two functions but citing one was
+        # rescued by file granularity, and after it the miss would be silent.
+        out = tmp / "traceos"
+        T.init(tmp, out, "Demo")
+        flow = out / "model" / "flows" / "example.md"
+        flow.write_text(
+            flow.read_text().replace(
+                '      - { kind: implementation, locator: "path/to/File.ext#symbol" }',
+                '      - { kind: implementation, locator: "mod.py#alpha" }',
+            )
+        )
+        T.observe(
+            out,
+            "assert.example.works",
+            "mod.py#alpha",
+            "supports",
+            "agent",
+            None,
+            T.Git(tmp),
+            NOW,
+        )
+        src.write_text("def alpha():\n    return 1\n\n\ndef beta():\n    return 123\n")
+        run("add", "mod.py")
+        run("commit", "-m", "touch beta again")
+        model = T.Model(out)
+        cleared = T.narrowed_references(model, "assert.example.works", T.Git(tmp))
+        check(
+            "TOOL symbol decay",
+            "narrowing reports the reference it cleared, it does not go quiet",
+            cleared == ["mod.py#alpha"],
+            str(cleared),
+        )
+        decay = T.decay_ratchet(model, ["mod.py"], NOW, T.Git(tmp), ["mod.py"], 0)
+        check(
+            "TOOL symbol decay",
+            "the ratchet carries it, so the author sees the locator set may be short",
+            [n["assertion"] for n in decay["narrowed"]] == ["assert.example.works"],
+            str(decay["narrowed"]),
+        )
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 

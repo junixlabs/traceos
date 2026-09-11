@@ -1001,6 +1001,20 @@ the per-language funcname heuristics git already ships, and falls back to the
 whole-file hash when git cannot resolve the anchor — loud, never silent, because a
 bound that cannot be established is not a bound that found nothing (INV-026).
 
+**The author now owes what file granularity used to cover by accident.** A claim must
+cite every symbol whose change could falsify it. Before narrowing, a claim spanning two
+functions but citing one still decayed when its sibling moved; after narrowing it does
+not, and the miss is silent. Measured case: a claim reading *"a dropped issue never
+reaches `markMergedOnClose`"* cited that one function, and the commit that made the
+claim true again changed a sibling in the same file — narrowing discards that commit,
+correctly by its own rule and wrongly for the claim. Nothing can check this
+mechanically, because checking it would mean understanding the sentence (§6.1).
+
+What the engine does instead is refuse to be quiet about it: every reference narrowing
+clears is reported as `NARROWED`, with the assertion that cited it, because narrowing is
+a boundary and a boundary reports what it excluded (INV-025). It is not a failure and
+does not gate. It is the signal that a locator set may be shorter than its claim.
+
 The heuristic is deliberately not ours. It is the one the developer already reads in
 every hunk header, so when it is wrong it is wrong in a way they have calibrated
 against; a locally written bound would be wrong in a way only this project knew.
