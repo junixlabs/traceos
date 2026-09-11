@@ -1013,6 +1013,21 @@ Integrity is computed and reported, never authored or decided.
 
 ---
 
+**Integrity is reported with its reason.** A verdict on its own is the silent boundary
+INV-025 forbids, in the line a reader looks at last and remembers longest. Observed on a
+clean install walking the printed steps: `0 error(s), 0 warning(s)` followed by
+`integrity: UNCERTAIN` — which says something is wrong and nothing about what, exactly
+when the reader has least context to guess.
+
+| Verdict | The reason names |
+|---|---|
+| `INVALID` | how many errors, and which codes |
+| `UNCERTAIN` | the subjects that do not resolve, or that rest on uncertain assertions, or the unmapped file count |
+| `VALID` | that there are no errors, every subject resolves, and nothing is uncertain |
+
+The verdict itself is unchanged by explaining it, and is still computed rather than
+decided (INV-001).
+
 ## 15. Representation
 
 Markdown with YAML frontmatter. The frontmatter is the model; the body is rationale

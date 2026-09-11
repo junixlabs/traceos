@@ -34,7 +34,7 @@ from .engine import (
     graph_diff,
     impact,
     init,
-    integrity,
+    integrity_with_reason,
     observe,
     ratchet,
     record_identity,
@@ -292,7 +292,7 @@ def main() -> int:
         findings = validate(model, repo_files, ctx, now, git)
         reality = resolve(model, ctx, now, git)
         cov = coverage(model, repo_files, now) if repo_files is not None else None
-        verdict = integrity(findings, reality, cov)
+        verdict, reason = integrity_with_reason(findings, reality, cov)
         if args.json:
             print(
                 json.dumps(
@@ -307,16 +307,16 @@ def main() -> int:
             warns = sum(1 for f in findings if f.level == "warn")
             print(f"\n{errors} error(s), {warns} warning(s)")
             if not git.available:
-                reason = (
+                why_no_git = (
                     "no --repo given"
                     if not getattr(args, "repo", None)
                     else "--repo is not a git repository"
                 )
                 print(
-                    f"note: {reason}, so observations were not checked "
+                    f"note: {why_no_git}, so observations were not checked "
                     f"against the repository (spec 6.3)"
                 )
-            print(f"integrity: {verdict}")
+            print(f"integrity: {verdict}  ({reason})")
         return 1 if any(f.level == "error" for f in findings) else 0
 
     if args.cmd == "resolve":

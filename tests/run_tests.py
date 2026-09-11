@@ -2604,6 +2604,46 @@ def inv_impact_says_when_it_cannot_discriminate():
     )
 
 
+def inv_integrity_says_why():
+    """§14.2 + INV-025. A verdict with no reason is a silent boundary.
+
+    Observed on a clean install walking the printed steps: `0 error(s), 0 warning(s)`
+    followed by `integrity: UNCERTAIN`, which tells a new user that something is wrong and
+    nothing about what, at the moment they have least context to guess.
+    """
+    model = T.Model(EXAMPLE)
+    findings = T.validate(model, None, {}, NOW)
+    reality = T.resolve(model, {}, NOW)
+    verdict, reason = T.integrity_with_reason(findings, reality, None)
+    check(
+        "INV-025 integrity reason",
+        "the verdict comes with a reason, not on its own",
+        bool(reason) and len(reason) > 20,
+        f"{verdict}: {reason}",
+    )
+    check(
+        "INV-025 integrity reason",
+        "an uncertain verdict names the subjects it rests on",
+        verdict != "UNCERTAIN" or "subject(s)" in reason,
+        f"{verdict}: {reason}",
+    )
+    check(
+        "INV-025 integrity reason",
+        "the verdict itself is unchanged by explaining it",
+        verdict == T.integrity(findings, reality, None),
+    )
+
+    # Positive control: an error must produce INVALID and say which codes.
+    broken = [*findings, T.Finding("error", "MADE_UP", "x", "y")]
+    verdict, reason = T.integrity_with_reason(broken, reality, None)
+    check(
+        "INV-025 integrity reason",
+        "an invalid verdict names the error codes",
+        verdict == "INVALID" and "MADE_UP" in reason,
+        f"{verdict}: {reason}",
+    )
+
+
 INVARIANTS = [
     inv_reality_ne_code,
     inv_code_change_ne_behavior_change,
@@ -2616,6 +2656,7 @@ INVARIANTS = [
     inv_outcome_can_be_refuted,
     inv_contradiction_is_evidence_not_wording,
     inv_impact_says_when_it_cannot_discriminate,
+    inv_integrity_says_why,
 ]
 
 
