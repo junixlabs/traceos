@@ -1835,16 +1835,41 @@ def coverage_findings(model: Model, repo_files: list[str]) -> list[Finding]:
 
 def integrity(findings: list[Finding], reality: dict, cov: dict | None) -> str:
     """§14.2. Computed, never authored."""
+    return integrity_with_reason(findings, reality, cov)[0]
+
+
+def integrity_with_reason(
+    findings: list[Finding], reality: dict, cov: dict | None
+) -> tuple[str, str]:
+    """The verdict and why it came out that way.
+
+    A verdict with no reason is the failure INV-025 names, in the line a reader looks at
+    last and remembers longest. Observed on a clean install: `0 error(s), 0 warning(s)`
+    followed by `integrity: UNCERTAIN` tells a new user that something is wrong and
+    nothing about what, at the exact moment they have the least context to guess.
+    """
     if any(f.level == "error" for f in findings):
-        return "INVALID"
-    if any(
-        v["status"] != "RESOLVED" or v["confidence"] == "uncertain"
-        for v in reality.values()
-    ):
-        return "UNCERTAIN"
+        errors = [f.code for f in findings if f.level == "error"]
+        return "INVALID", f"{len(errors)} error(s): {', '.join(sorted(set(errors)))}"
+
+    unresolved = [k for k, v in reality.items() if v["status"] != "RESOLVED"]
+    uncertain = [k for k, v in reality.items() if v["confidence"] == "uncertain"]
+    if unresolved:
+        return "UNCERTAIN", (
+            f"{len(unresolved)} subject(s) do not resolve: {', '.join(sorted(unresolved))}"
+        )
+    if uncertain:
+        return "UNCERTAIN", (
+            f"{len(uncertain)} subject(s) rest on uncertain assertions: "
+            f"{', '.join(sorted(uncertain))}. An artifact moved under its observation, "
+            f"or nothing has observed it yet"
+        )
     if cov and cov["artifacts_unmapped"]:
-        return "UNCERTAIN"
-    return "VALID"
+        return "UNCERTAIN", (
+            f"{cov['artifacts_unmapped']} repository file(s) map to no node, so coverage "
+            f"cannot be established (INV-010)"
+        )
+    return "VALID", "no errors, every subject resolves, and nothing is uncertain"
 
 
 # -------------------------------------------------------- recorded writers
