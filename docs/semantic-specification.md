@@ -980,10 +980,36 @@ TraceOS v0.1 is not an IDE, a Git replacement, an APM, a test framework, a
 documentation generator, a UML replacement, a code dependency analyzer, a runtime
 monitoring platform, or an AI model. It may consume any of these as Evidence.
 
+**It is not a map of the code**, and the nearest way to make it one is to read the
+tree first. `init` therefore opens no source file: discovery is progressive - the
+boundary, then one flow, then the evidence that flow's claims need. An agent handed
+a file list at step one writes what the structure looks like, because that is what
+is in front of it; a model built that way mirrors the codebase, which §1 says a
+System Model is not. The file list coverage needs (INV-010) is derived when it is
+needed and never stored, for the same reason no other derived value is (INV-001).
+
 Two things are deliberately outside the skill set as well: **implementation**, which
 is the agent's ordinary coding work between tracing and reconciling, and the
 **validator**, which is an engine capability rather than a skill so that invariants
 are enforced mechanically instead of by careful reading.
+
+### 6.3.1 Decay is asked of the symbol, not of the file
+
+A locator names a symbol (INV-022), so the question "did this evidence change" is a
+question about that symbol. The engine asks `git log -L :<symbol>:<path>`, which uses
+the per-language funcname heuristics git already ships, and falls back to the
+whole-file hash when git cannot resolve the anchor — loud, never silent, because a
+bound that cannot be established is not a bound that found nothing (INV-026).
+
+The heuristic is deliberately not ours. It is the one the developer already reads in
+every hunk header, so when it is wrong it is wrong in a way they have calibrated
+against; a locally written bound would be wrong in a way only this project knew.
+
+Measured before it existed: 145 of this repository's file-level decay events narrowed
+to 23, and on a peer's TypeScript repository 132 narrowed to 39 — one claim there cited
+a symbol whose file had moved 21 times and whose symbol had moved once. The remainder
+were re-observation requests for code the change never touched, which is the material a
+rubber stamp is made of (§13.0.1).
 
 ---
 

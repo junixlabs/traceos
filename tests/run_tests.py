@@ -986,8 +986,12 @@ def tool_init():
     try:
         git_repo(tmp)
         out = tmp / "traceos"
-        files = T.init(tmp, out, "Demo")
-        check("TOOL init", "indexes the repository file list", "src/svc.ts" in files)
+        created = T.init(tmp, out, "Demo")
+        check(
+            "TOOL init",
+            "reads no source file, so nothing is inferred from the tree",
+            "src/svc.ts" not in created,
+        )
         check(
             "TOOL init",
             "scaffold carries skills/ so the agent reads them locally",
@@ -998,7 +1002,16 @@ def tool_init():
             "scaffold does not freeze a copy of the engine",
             not (out / "tools").exists() and not (out / "schema").exists(),
         )
-        check("TOOL init", "writes repo-files.txt", (out / "repo-files.txt").exists())
+        check(
+            "TOOL init",
+            "does not store a file list; the denominator is derived when needed",
+            not (out / "repo-files.txt").exists(),
+        )
+        check(
+            "TOOL init",
+            "the denominator is still available on demand",
+            "src/svc.ts" in T.repo_file_list(tmp),
+        )
         findings = T.validate(T.Model(out), None, {}, NOW)
         errors = [f for f in findings if f.level == "error"]
         check(
@@ -1182,6 +1195,65 @@ def tool_identity_ledger():
             "TOOL identity",
             "a ledger entry never becomes a relationship (INV-014)",
             all(r.get("type") != "supersedes" for r in rel),
+        )
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def tool_symbol_decay():
+    """INV-024 + spec 6.3: an edit to another symbol in the same file is not decay.
+
+    Measured before this existed: 145 of this repository's file-level decay events
+    narrowed to 23 once git was asked which symbol moved. The rest were re-observation
+    requests for code the change never touched, which is what a rubber stamp is made of.
+    """
+    import subprocess
+
+    tmp = pathlib.Path(tempfile.mkdtemp(prefix="traceos-sym-"))
+    try:
+
+        def run(*a):
+            return subprocess.run(
+                ("git", "-C", str(tmp), *a), capture_output=True, text=True
+            )
+
+        run("init")
+        run("config", "user.email", "t@t")
+        run("config", "user.name", "t")
+        src = tmp / "mod.py"
+        src.write_text("def alpha():\n    return 1\n\n\ndef beta():\n    return 2\n")
+        run("add", "mod.py")
+        run("commit", "-m", "init")
+        git = T.Git(tmp)
+        head = git.head()
+        blob = git.blob("mod.py")
+
+        src.write_text("def alpha():\n    return 1\n\n\ndef beta():\n    return 99\n")
+        run("add", "mod.py")
+        run("commit", "-m", "touch beta only")
+
+        check(
+            "TOOL symbol decay",
+            "the file changed, so the whole-file answer is still yes",
+            git.changed_since(head, "mod.py", blob) is True,
+        )
+        check(
+            "TOOL symbol decay",
+            "an edit to another symbol does not decay this one",
+            git.changed_since(head, "mod.py", blob, None, "alpha") is False,
+        )
+        # Positive control. Without it the check above passes for an engine that
+        # answers False to everything, which is the failure this repository has
+        # already shipped once.
+        check(
+            "TOOL symbol decay",
+            "an edit to the cited symbol still decays it",
+            git.changed_since(head, "mod.py", blob, None, "beta") is True,
+        )
+        check(
+            "TOOL symbol decay",
+            "an anchor git cannot resolve falls back, it does not report clean",
+            git.changed_since(head, "mod.py", blob, None, "no_such_symbol") is True,
         )
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
@@ -1943,6 +2015,7 @@ TOOLING = [
     tool_observe,
     tool_identity_ledger,
     tool_artifact_changed,
+    tool_symbol_decay,
     tool_content_not_history,
     tool_ratchet,
     tool_decay_ratchet,

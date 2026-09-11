@@ -1,16 +1,20 @@
 ---
 name: reconciling-reality
-description: Reconcile the TraceOS System Model with Effective Reality after a change, or when new evidence suggests the model is stale or wrong. Use after implementation, deployment, configuration change, an external behavior change, or when runtime evidence or a test contradicts the model.
+description: Compare a new implementation against the TraceOS semantic model and resolve the contradictions, reconciling the model with Effective Reality. Use after implementation, deployment, configuration change, an external behavior change, or when runtime evidence or a test contradicts the model.
 ---
 
 # Reconciling Reality
 
 ## Purpose
 
-> **Reconcile after change.**
+**Compare the new implementation against the semantic model and resolve the
+contradictions.** The subject is the model, not the prose around it: this skill is not
+"update the documentation after coding". It establishes Effective Reality from Evidence
+and applicable Context, finds where the model and that reality disagree, and settles
+each disagreement — by correcting the model, by correcting the claim that was never
+true, or by recording that the disagreement is real and unresolved.
 
-Establish Effective Reality from Evidence and applicable Context, *then* decide how
-the model should change.
+> **Reconcile after change.**
 
 > **Reality is resolved, not authored.**
 
@@ -132,6 +136,22 @@ available (INV-018).
 > Payment has a bug. Reality: payment fails. Model: payment fails.
 > **Integrity = VALID**, even though the software is wrong.
 
+### 10. Hand the loop back
+
+Reconciliation is not the end of a task; it is the point where the loop either closes or
+restarts. Before reporting, say explicitly which of these happened:
+
+| What reconciliation found | Where the work goes next |
+|---|---|
+| model and reality agree, integrity computed `valid` | the loop closes |
+| an assumption the trace relied on turned out wrong | back to `tracing-change` — the scope was wrong, so the impact report was too |
+| an area the change touched was never modelled at all | back to `understanding-system` — new Flows, Nodes and evidence, starting from the named gap |
+| a contradiction is real and no evidence settles it | it stays `uncertain` with the refuting observation recorded — not quietly dropped |
+
+On a system anyone is still changing, a reconciliation that sends nothing back and
+reports no gap is far more likely to have skipped the looking than to have found a model
+that was already complete.
+
 ## Safety
 
 MUST NOT: author a Reality document · author confidence · let `proposed`/`planned`
@@ -152,7 +172,8 @@ observation first.
 8. Identity changes + ledger entries
 9. Validation findings
 10. Coverage — counts and named gaps
-11. **Integrity** as computed
+11. **Integrity** as computed — by the validator, not by this skill
+12. What goes back to `tracing-change` or `understanding-system`, and why
 
 The result MUST distinguish **established** reality from **uncertain** reality from
 **unknown / unmodeled** behavior.

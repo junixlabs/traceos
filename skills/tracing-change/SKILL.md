@@ -1,15 +1,19 @@
 ---
 name: tracing-change
-description: Trace a proposed or observed change from implementation artifacts to affected semantic entities and determine potential system impact BEFORE changing anything. Use when a code change is requested, a git diff is available, configuration or database schema changes, or an external contract changes.
+description: Determine the scope, relationships and risk of one change before it is made, tracing implementation artifacts to affected semantic entities. Use when a code change is requested, a git diff is available, configuration or database schema changes, or an external contract changes.
 ---
 
 # Tracing Change
 
 ## Purpose
 
+**Determine the scope, the relationships and the risk of one change** — before it is
+made. Scope is which semantic entities the change reaches; relationships are how it
+travels from there; risk is what the trace could not settle.
+
 > **Trace before change.**
 
-Determine semantic impact. Do not equate changed files with changed behavior.
+Do not equate changed files with changed behavior.
 
 ```
 Code Change  ≠  Behavior Change  ≠  Flow Change
@@ -85,6 +89,23 @@ one exists but it is not modeled, that is an `unknown`, not an edge.
 Exactly four tiers (INV-019): `certain` · `likely` · `inspect` · `unknown`.
 
 Report the **frontier**, not the transitive closure.
+
+### 5b. State the risk without inventing a number
+
+Risk here is not a score and not a fifth tier. Authoring one would put a derived value
+in the AUTHORED tier, which is exactly what INV-001 and INV-002 forbid. Risk is what the
+existing output already carries, said out loud:
+
+- the size of `unknown` — changed artifacts that map to no semantic entity (INV-019).
+  A large `unknown` is the risk; it is not the absence of one.
+- the size of `inspect` — reachable, but the model cannot say whether behavior moves.
+- **whether the trace could establish anything at all.** A trace that resolves no
+  artifact returns *could not establish*, never *no impact* (INV-026). Report it as the
+  third outcome it is.
+- coverage gaps that overlap the traced area by name (INV-010, INV-012).
+
+If a reader has to ask "so is this safe?", the tiers were reported without their
+denominator. Give the denominator.
 
 ### 6. Evaluate Context
 

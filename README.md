@@ -91,7 +91,7 @@ traceos init /path/to/repo --name "My System"
 
 # the reference model
 cd examples/ecommerce
-traceos validate . --repo-files repo-files.txt
+traceos validate . --repo-files repo-files.txt   # a fixture; a real repo uses --repo .
 traceos resolve  . --context tenant=a    # → gateway v2
 traceos resolve  . --context tenant=b    # → gateway v1
 traceos impact   . --changed "src/refund/RefundService.ts"
