@@ -993,6 +993,24 @@ is the agent's ordinary coding work between tracing and reconciling, and the
 **validator**, which is an engine capability rather than a skill so that invariants
 are enforced mechanically instead of by careful reading.
 
+### 6.3.1 Decay is asked of the symbol, not of the file
+
+A locator names a symbol (INV-022), so the question "did this evidence change" is a
+question about that symbol. The engine asks `git log -L :<symbol>:<path>`, which uses
+the per-language funcname heuristics git already ships, and falls back to the
+whole-file hash when git cannot resolve the anchor — loud, never silent, because a
+bound that cannot be established is not a bound that found nothing (INV-026).
+
+The heuristic is deliberately not ours. It is the one the developer already reads in
+every hunk header, so when it is wrong it is wrong in a way they have calibrated
+against; a locally written bound would be wrong in a way only this project knew.
+
+Measured before it existed: 145 of this repository's file-level decay events narrowed
+to 23, and on a peer's TypeScript repository 132 narrowed to 39 — one claim there cited
+a symbol whose file had moved 21 times and whose symbol had moved once. The remainder
+were re-observation requests for code the change never touched, which is the material a
+rubber stamp is made of (§13.0.1).
+
 ---
 
 ## Appendix A — Invariant index

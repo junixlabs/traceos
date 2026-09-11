@@ -1200,6 +1200,65 @@ def tool_identity_ledger():
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+def tool_symbol_decay():
+    """INV-024 + spec 6.3: an edit to another symbol in the same file is not decay.
+
+    Measured before this existed: 145 of this repository's file-level decay events
+    narrowed to 23 once git was asked which symbol moved. The rest were re-observation
+    requests for code the change never touched, which is what a rubber stamp is made of.
+    """
+    import subprocess
+
+    tmp = pathlib.Path(tempfile.mkdtemp(prefix="traceos-sym-"))
+    try:
+
+        def run(*a):
+            return subprocess.run(
+                ("git", "-C", str(tmp), *a), capture_output=True, text=True
+            )
+
+        run("init")
+        run("config", "user.email", "t@t")
+        run("config", "user.name", "t")
+        src = tmp / "mod.py"
+        src.write_text("def alpha():\n    return 1\n\n\ndef beta():\n    return 2\n")
+        run("add", "mod.py")
+        run("commit", "-m", "init")
+        git = T.Git(tmp)
+        head = git.head()
+        blob = git.blob("mod.py")
+
+        src.write_text("def alpha():\n    return 1\n\n\ndef beta():\n    return 99\n")
+        run("add", "mod.py")
+        run("commit", "-m", "touch beta only")
+
+        check(
+            "TOOL symbol decay",
+            "the file changed, so the whole-file answer is still yes",
+            git.changed_since(head, "mod.py", blob) is True,
+        )
+        check(
+            "TOOL symbol decay",
+            "an edit to another symbol does not decay this one",
+            git.changed_since(head, "mod.py", blob, None, "alpha") is False,
+        )
+        # Positive control. Without it the check above passes for an engine that
+        # answers False to everything, which is the failure this repository has
+        # already shipped once.
+        check(
+            "TOOL symbol decay",
+            "an edit to the cited symbol still decays it",
+            git.changed_since(head, "mod.py", blob, None, "beta") is True,
+        )
+        check(
+            "TOOL symbol decay",
+            "an anchor git cannot resolve falls back, it does not report clean",
+            git.changed_since(head, "mod.py", blob, None, "no_such_symbol") is True,
+        )
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 def tool_artifact_changed():
     """spec 6.3: confidence must fall with nobody editing a model file."""
     tmp = pathlib.Path(tempfile.mkdtemp(prefix="traceos-chg-"))
@@ -1956,6 +2015,7 @@ TOOLING = [
     tool_observe,
     tool_identity_ledger,
     tool_artifact_changed,
+    tool_symbol_decay,
     tool_content_not_history,
     tool_ratchet,
     tool_decay_ratchet,

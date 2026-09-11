@@ -771,11 +771,13 @@ def computed_confidence(
         if git and git.available:
             ref = observation.get("observed_ref")
             if ref and reference:
+                path, _, anchor = reference.partition("#")
                 changed = git.changed_since(
                     ref,
-                    reference.split("#", 1)[0],
+                    path,
                     observation.get("observed_blob"),
                     observation.get("observed_norm"),
+                    anchor or None,
                 )
                 if changed is True:
                     return "uncertain"
@@ -1256,13 +1258,20 @@ def decay_ratchet(
             if _locator_matches(loc, path, prefix)
         ]
         if hits:
-            touched.append(
-                {
-                    "assertion": aid,
-                    "references": sorted(set(hits)),
-                    "stale": stale_references(model, aid, git),
-                }
-            )
+            stale = stale_references(model, aid, git)
+            # A reference the change touched but did not invalidate is nothing to
+            # discharge. Before decay could ask git which symbol moved, every edit
+            # to a file put every assertion citing it here, and the only way to
+            # clear the gate was to re-observe references that had not changed -
+            # which is the rubber stamp this invariant exists to prevent.
+            if any(ref in stale for ref in hits) or (not git or not git.available):
+                touched.append(
+                    {
+                        "assertion": aid,
+                        "references": sorted(set(hits)),
+                        "stale": stale,
+                    }
+                )
 
     grew = baseline is not None and len(uncertain) > baseline
     return {
