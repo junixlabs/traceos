@@ -5,11 +5,11 @@
     observe  <model_dir> --assertion ID --reference LOC --supports supports|refutes
     identity <model_dir> --id NEW --supersedes OLD --reason TEXT
     ratchet  <model_dir> --changed-from FILE --scope DIR [--decay-baseline N]
-    validate <model_dir> [--repo-files FILE] [--repo PATH]
+    validate <model_dir> [--repo PATH] [--repo-files FILE]
     resolve  <model_dir> [--context k=v ...] [--json]
     impact   <model_dir> --changed LOCATOR [--changed ...] [--depth N] [--json]
     diff     <model_a> <model_b> [--json]
-    coverage <model_dir> --repo-files FILE [--json]
+    coverage <model_dir> (--repo PATH | --repo-files FILE) [--json]
     explore  <model_dir> [--out FILE] [--repo-files FILE] [--context k=v,...]
 
 This module owns argument parsing and nothing else. The engine lives in engine.py
@@ -38,6 +38,7 @@ from .engine import (
     observe,
     ratchet,
     record_identity,
+    repo_file_list,
     resolve,
     validate,
 )
@@ -54,8 +55,16 @@ def parse_context(pairs: list[str]) -> dict:
     return ctx
 
 
-def read_repo_files(path: str | None) -> list[str] | None:
+def read_repo_files(path: str | None, repo: str | None = None) -> list[str] | None:
+    """--repo-files reads a list; --repo alone derives one.
+
+    Deriving is the normal case. A checked-in file list is an authored copy of a
+    derived fact and goes stale on the next commit (INV-001); it stays supported
+    only for a fixture whose repository does not exist, such as examples/ecommerce.
+    """
     if not path:
+        if repo:
+            return repo_file_list(pathlib.Path(repo).resolve())
         return None
     target = pathlib.Path(path)
     if not target.exists():
@@ -124,7 +133,8 @@ def main() -> int:
 
     p = sub.add_parser("coverage")
     p.add_argument("model")
-    p.add_argument("--repo-files", required=True)
+    p.add_argument("--repo-files")
+    p.add_argument("--repo", default=None)
     p.add_argument("--json", action="store_true")
 
     p = sub.add_parser("ratchet")
@@ -173,9 +183,16 @@ def main() -> int:
     if args.cmd == "init":
         repo = pathlib.Path(args.repo).resolve()
         out = pathlib.Path(args.out).resolve() if args.out else repo / "traceos"
-        files = init(repo, out, args.name or repo.name)
+        created = init(repo, out, args.name or repo.name)
         rel = out.relative_to(repo) if out.is_relative_to(repo) else out
-        print(f"scaffolded {out}  ({len(files)} repository files indexed)")
+        print(f"scaffolded {out}  ({len(created)} files)")
+        print(
+            "\nno source file was read. Discovery goes from the outside in: the\n"
+            "boundary, then one flow, then the evidence that flow's claims need.\n"
+            "Reading the tree first produces a map of the code, which is a different\n"
+            "artifact - and an agent holding the tree writes what the structure looks\n"
+            "like instead of what the system does."
+        )
         print("\nnext — model one small flow first, not the important one:")
         print(
             "  1. pick a flow you already understand end to end. Three or four "
@@ -193,8 +210,9 @@ def main() -> int:
             f"     dependency'. The file says so; nothing is suggested for you."
         )
         print(
-            f"  4. cd {rel} && traceos validate . "
-            f"--repo-files repo-files.txt --repo {repo}"
+            f"  4. cd {rel} && traceos validate . --repo {repo}\n"
+            f"     the file list coverage needs is derived from the repository "
+            f"when it\n     is needed, never stored."
         )
         print(
             f"  5. record that you checked one piece of evidence:\n"
@@ -220,7 +238,7 @@ def main() -> int:
             explore.build(
                 model_dir,
                 pathlib.Path(args.repo).resolve() if args.repo else None,
-                read_repo_files(args.repo_files),
+                read_repo_files(args.repo_files, args.repo),
                 contexts,
             ),
             encoding="utf-8",
@@ -270,7 +288,7 @@ def main() -> int:
 
     if args.cmd == "validate":
         ctx = parse_context(args.context)
-        repo_files = read_repo_files(args.repo_files)
+        repo_files = read_repo_files(args.repo_files, args.repo)
         findings = validate(model, repo_files, ctx, now, git)
         reality = resolve(model, ctx, now, git)
         cov = coverage(model, repo_files, now) if repo_files is not None else None
@@ -414,7 +432,13 @@ def main() -> int:
         return 1 if failed else 0
 
     if args.cmd == "coverage":
-        cov = coverage(model, read_repo_files(args.repo_files), now)
+        repo_files = read_repo_files(args.repo_files, args.repo)
+        if repo_files is None:
+            raise SystemExit(
+                "coverage needs the repository file list (INV-010): pass --repo "
+                "PATH to derive it, or --repo-files FILE for a fixture."
+            )
+        cov = coverage(model, repo_files, now)
         print(json.dumps(cov, indent=2))
         return 0
 

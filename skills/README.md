@@ -46,8 +46,11 @@ that did not look.
 ## Three things deliberately left out
 
 **`traceos init`** is a bootstrap operation, not a skill. It scaffolds a model
-directory and indexes the repository; it does not decide what the system does, and
-it suggests nothing, because a wrong suggestion at step one is worse than none.
+directory and **reads no source file**: discovery is progressive — the boundary, then
+one flow, then the evidence that flow's claims need. It suggests nothing, because a
+wrong suggestion at step one is worse than none, and it indexes nothing, because an
+agent handed a file list writes what the structure looks like instead of what the
+system does. That artifact is a map of the code, and it is a different product.
 
 **Implementation** happens between `tracing-change` and `reconciling-reality`, using
 whatever coding ability the agent already has. TraceOS does not own writing code —

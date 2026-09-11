@@ -980,6 +980,14 @@ TraceOS v0.1 is not an IDE, a Git replacement, an APM, a test framework, a
 documentation generator, a UML replacement, a code dependency analyzer, a runtime
 monitoring platform, or an AI model. It may consume any of these as Evidence.
 
+**It is not a map of the code**, and the nearest way to make it one is to read the
+tree first. `init` therefore opens no source file: discovery is progressive - the
+boundary, then one flow, then the evidence that flow's claims need. An agent handed
+a file list at step one writes what the structure looks like, because that is what
+is in front of it; a model built that way mirrors the codebase, which §1 says a
+System Model is not. The file list coverage needs (INV-010) is derived when it is
+needed and never stored, for the same reason no other derived value is (INV-001).
+
 Two things are deliberately outside the skill set as well: **implementation**, which
 is the agent's ordinary coding work between tracing and reconciling, and the
 **validator**, which is an engine capability rather than a skill so that invariants

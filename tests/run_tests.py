@@ -986,8 +986,12 @@ def tool_init():
     try:
         git_repo(tmp)
         out = tmp / "traceos"
-        files = T.init(tmp, out, "Demo")
-        check("TOOL init", "indexes the repository file list", "src/svc.ts" in files)
+        created = T.init(tmp, out, "Demo")
+        check(
+            "TOOL init",
+            "reads no source file, so nothing is inferred from the tree",
+            "src/svc.ts" not in created,
+        )
         check(
             "TOOL init",
             "scaffold carries skills/ so the agent reads them locally",
@@ -998,7 +1002,16 @@ def tool_init():
             "scaffold does not freeze a copy of the engine",
             not (out / "tools").exists() and not (out / "schema").exists(),
         )
-        check("TOOL init", "writes repo-files.txt", (out / "repo-files.txt").exists())
+        check(
+            "TOOL init",
+            "does not store a file list; the denominator is derived when needed",
+            not (out / "repo-files.txt").exists(),
+        )
+        check(
+            "TOOL init",
+            "the denominator is still available on demand",
+            "src/svc.ts" in T.repo_file_list(tmp),
+        )
         findings = T.validate(T.Model(out), None, {}, NOW)
         errors = [f for f in findings if f.level == "error"]
         check(

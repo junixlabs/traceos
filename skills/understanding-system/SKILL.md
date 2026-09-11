@@ -37,8 +37,10 @@ the rules. Load the reference file you need:
 
 - Scaffolding a model directory on a repository with none — `traceos init` is a
   bootstrap operation, not a skill. Run it, then start this skill at step 1. `init`
-  indexes files; it names no Flow and suggests no boundary, because a wrong suggestion
-  at step one is copied forward and never re-examined.
+  reads no source file: it names no Flow, suggests no boundary and builds no file
+  index, because a wrong suggestion at step one is copied forward and never
+  re-examined — and a file index at step one is an invitation to infer the model from
+  the tree, which produces a map of the code instead of a model of the behavior.
 - Implementing a requested code change — that is not a TraceOS skill.
 - Tracing the impact of a change → `tracing-change`.
 - Checking whether the model still holds after a change → `reconciling-reality`.

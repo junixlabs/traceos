@@ -1407,16 +1407,35 @@ def _packaged_asset_dir(name: str) -> pathlib.Path | None:
     return packaged if isinstance(packaged, pathlib.Path) and packaged.is_dir() else None
 
 
-def init(repo: pathlib.Path, out: pathlib.Path, name: str) -> list[str]:
+def repo_file_list(repo: pathlib.Path) -> list[str]:
+    """The coverage denominator, derived when it is needed and never stored.
+
+    A file list is a fact about the repository, so it belongs to no tier but the
+    derived one (INV-001). `init` used to write it to `repo-files.txt`, which made
+    the first artifact of a new model a copy of `git ls-files` that went stale on
+    the next commit - and, worse, put 2,758 paths in front of an agent at step one
+    and invited it to infer a model from them.
+    """
     git = Git(repo)
     files = [f for f in (git._run("ls-files") or "").splitlines() if f]
-    if not files:
-        files = [
-            str(p.relative_to(repo))
-            for p in repo.rglob("*")
-            if p.is_file() and ".git" not in p.parts
-        ]
+    if files:
+        return files
+    return sorted(
+        str(p.relative_to(repo))
+        for p in repo.rglob("*")
+        if p.is_file() and ".git" not in p.parts
+    )
 
+
+def init(repo: pathlib.Path, out: pathlib.Path, name: str) -> list[str]:
+    """Scaffolds a model. Deliberately reads no source file.
+
+    Discovery is progressive: the boundary, then one flow, then the evidence that
+    flow's claims need. Reading the tree first produces a map of the code, which is
+    a different artifact with a different purpose - and once an agent has the tree
+    in front of it, everything it writes is inferred from structure rather than
+    established from behavior.
+    """
     slug = re.sub(r"[^a-z0-9-]", "-", name.lower()).strip("-") or "system"
     (out / "model" / "flows").mkdir(parents=True, exist_ok=True)
     (out / "observations").mkdir(exist_ok=True)
@@ -1549,5 +1568,8 @@ Locators are repository-root relative and name a symbol, never a line (INV-022).
 """,
     )
 
-    (out / "repo-files.txt").write_text("\n".join(files) + "\n", encoding="utf-8")
-    return files
+    return sorted(
+        str(path.relative_to(out))
+        for path in out.rglob("*")
+        if path.is_file() and "skills" not in path.parts
+    )
