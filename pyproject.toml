@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "traceos"
-version = "0.1.0"
+version = "0.2.0"
 description = "A semantic reasoning framework that lets AI agents trace semantic impact before a change and reconcile the model with reality after it"
 readme = "README.md"
 license = { file = "LICENSE" }
