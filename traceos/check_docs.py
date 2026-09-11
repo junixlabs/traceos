@@ -31,6 +31,14 @@ def main() -> int:
     for path in (ROOT / "skills").rglob("*.md"):
         reference |= ids_in(path)
 
+    # skills/reference/ is the stated single home for the rules; the SKILL.md files
+    # cite by id instead of restating. Scanning all of skills/ satisfied "cited by a
+    # skill" from a SKILL.md alone, so two rules were added with no reference entry
+    # and this check stayed green - the drift it exists to catch, in itself.
+    reference_home: set[str] = set()
+    for path in (ROOT / "skills" / "reference").rglob("*.md"):
+        reference_home |= ids_in(path)
+
     engine: set[str] = set()
     for name in ("engine.py", "explore.py", "cli.py"):
         engine |= ids_in(ROOT / "traceos" / name)
@@ -41,10 +49,11 @@ def main() -> int:
     # INV-026. Every source empty is the shape of a broken run, not a clean one:
     # a wrong root, a rename, a read that failed. Assert the floor before
     # comparing sets, because comparing empty sets always agrees.
-    if not (spec_ids and reference and engine and indexed):
+    if not (spec_ids and reference and engine and indexed and reference_home):
         print(
             "could not establish: one of the four sources yielded no invariant "
             f"at all (spec {len(spec_ids)}, skills {len(reference)}, "
+            f"reference {len(reference_home)}, "
             f"engine {len(engine)}, appendix {len(indexed)}).\n"
             "An empty scan is not a pass.",
             file=sys.stderr,
@@ -62,6 +71,10 @@ def main() -> int:
         "referenced by the engine but not defined in the specification", engine - spec_ids
     )
     report("defined in the specification but cited by no skill", spec_ids - reference)
+    report(
+        "cited by a skill but with no entry in skills/reference/",
+        spec_ids - reference_home,
+    )
     report(
         "defined in the specification but not traceable in the engine", spec_ids - engine
     )

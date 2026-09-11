@@ -1021,7 +1021,7 @@ Prose for humans. Not parsed.
 
 ## 16. Non-goals
 
-TraceOS v0.1 is not an IDE, a Git replacement, an APM, a test framework, a
+TraceOS is not an IDE, a Git replacement, an APM, a test framework, a
 documentation generator, a UML replacement, a code dependency analyzer, a runtime
 monitoring platform, or an AI model. It may consume any of these as Evidence.
 

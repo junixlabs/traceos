@@ -126,6 +126,23 @@ compares **expected / implemented / observed** rather than model against code.
 model suggests four tiers collapse into one. If they collapse, the cross-layer map is a
 list of everything, which is the same as no map.
 
+## One roadmap entry this direction deleted
+
+The v0.1 roadmap listed **v0.2 — parser / model engine**. It is gone, not rescheduled.
+
+Two sessions of measurement, one on each side of a peer review, established that a
+symbol-granular bound written here is either unsafe or is a parser. Then the answer
+turned out to be already installed: git ships per-language funcname heuristics, and
+`git log -L :symbol:path` narrowed 145 of this repository's file-level decay events to
+23, and a peer's 132 to 39, on TypeScript and Python alike with nothing configured.
+
+The heuristic that shipped is therefore not ours, and that is its best property: it is
+the one the developer already reads in every hunk header, so when it is wrong it is
+wrong in a way they have calibrated against.
+
+The general form is worth keeping, because this project had to learn it twice in a day:
+**check what the dependency already does before building the thing it does.**
+
 ## What this direction refuses
 
 Named here because a direction is defined as much by what it declines when the pressure

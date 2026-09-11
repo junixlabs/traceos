@@ -143,8 +143,9 @@ confidence and is reported — unverifiable is not the same as verified.
 ## Layout
 
 ```
-docs/semantic-specification.md   the definition — 25 numbered invariants
-docs/decisions/                  14 ADRs — why each rule exists
+docs/semantic-specification.md   the definition — 28 numbered invariants
+docs/decisions/                  15 ADRs — why each rule exists
+docs/DIRECTION.md                where this is going, and what would kill each step
 traceos/schema/traceos.schema.json  frontmatter structure
 examples/ecommerce/              reference model touching every entity
 examples/traceos-itself/         TraceOS modelled in TraceOS
@@ -154,26 +155,36 @@ traceos/explore.py               the HTML view
 traceos/site.py                  the Pages site, built from the models
 traceos/cli.py                   command line: init, observe, validate, resolve,
                                  impact, diff, coverage, explore
-tests/run_tests.py               13 stress cases, 8 invariants, 10 tooling groups
+tests/run_tests.py               13 stress cases, 9 invariants, 16 tooling groups
 ```
 
 ## Status
 
-v0.1 is a semantic baseline with a working reference implementation: production-ready
-**as a specification**, not yet as tooling. The known gaps are measured rather than
-guessed — see [the risks still carried](docs/DEVELOPMENT-PLAN.md#risks-this-design-is-still-carrying)
-and the [changelog](CHANGELOG.md). The shortest one: the validator cannot verify an
-identity decision, so a graph diff is objective only if ids were assigned correctly,
-and the specification says so out loud.
+v0.2. A semantic baseline with a working reference implementation: production-ready **as
+a specification**, and honest rather than finished **as tooling**. The known gaps are
+measured rather than guessed — the [changelog](CHANGELOG.md) and the
+[issue tracker](https://github.com/junixlabs/traceos/issues) carry them with their
+numbers.
 
-```
-v0.1  Semantic foundation + reference engine   ← here
-v0.2  Parser / model engine
-v0.3  Agent integration
-v0.4  Graph explorer
-v0.5  Change impact engine
-v1.0  Production-grade TraceOS
-```
+The roadmap is no longer a feature list. It is four horizons, each with the measurement
+that would kill it, in [`docs/DIRECTION.md`](docs/DIRECTION.md):
+
+| | | Decided by |
+|---|---|---|
+| **H1** Erosion, gated | largely built | the cost of keeping a model current — unmeasured (#10) |
+| **H2** Outcome carries evidence | mechanism built | three real incidents: would it have caught any? (ADR-015) |
+| **H3** Intent as provenance | built | whether teams can cite a frozen record at all |
+| **H4** The loop crosses layers | not started | whether four impact tiers survive a dense graph (#5) |
+
+**The old roadmap said v0.2 was "parser / model engine". Measurement retired that line.**
+Git already ships per-language funcname heuristics, and `git log -L` narrowed 145 of this
+repository's file-level decay events to 23 — so the parser this project was going to build
+is one it should never build, and the entry was replaced rather than rescheduled.
+
+Two things nothing on that list fixes, and both are written down rather than deferred:
+the validator cannot verify an identity decision, so a graph diff is objective only if
+ids were assigned correctly; and **no mechanism here detects a claim that is simply
+wrong** (#42, #45) — only one that has gone stale.
 
 ## License
 
