@@ -1563,6 +1563,48 @@ def tool_decay_ratchet():
     )
 
 
+def tool_empty_scan_is_not_a_pass():
+    """INV-026. A scope naming nothing is an empty scan, and an empty scan is a
+    third outcome - not a pass.
+
+    Raised by a reviewer whose own founding incident was this exact shape: a scoped
+    run diffed a branch against itself, walked zero files, printed its success line,
+    and 15 errors reached main through a green check that had examined nothing.
+    """
+    model = T.Model(EXAMPLE)
+
+    real = T.ratchet(model, ["src/payment/PaymentProcessor.ts"], ["src/"])
+    check(
+        "TOOL empty scan",
+        "a scope the model knows about has a non-zero denominator",
+        real["locators_in_scope"] > 0,
+        str(real["locators_in_scope"]),
+    )
+
+    typo = T.ratchet(model, ["src/payment/PaymentProcessor.ts"], ["srcc/"])
+    check(
+        "TOOL empty scan",
+        "a mistyped scope reports zero locators rather than a clean pass",
+        typo["locators_in_scope"] == 0 and typo["unmapped"] == [],
+        str(typo),
+    )
+
+    settled = T.decay_ratchet(model, [], NOW, None, ["src/order/"], 0)
+    check(
+        "TOOL empty scan",
+        "the decay denominator counts assertions in scope, not just the uncertain",
+        settled["assertions_in_scope"] >= 1 and settled["uncertain"] == [],
+        str(settled),
+    )
+    blind = T.decay_ratchet(model, [], NOW, None, ["nowhere/"], 0)
+    check(
+        "TOOL empty scan",
+        "a scope matching no assertion is distinguishable from one that passes",
+        blind["assertions_in_scope"] == 0 and not blind["grew"],
+        str(blind),
+    )
+
+
 def tool_reflow_is_not_a_change():
     """A formatter run must not invalidate a claim; a reindent must.
 
@@ -1785,6 +1827,7 @@ TOOLING = [
     tool_decay_ratchet,
     tool_stale_references,
     tool_reflow_is_not_a_change,
+    tool_empty_scan_is_not_a_pass,
     tool_anchor_rot,
     tool_monorepo_prefix,
     tool_explore,

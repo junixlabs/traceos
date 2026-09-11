@@ -57,8 +57,14 @@ jobs:
         run: python3 -m traceos.site --out /tmp/site --repo .
       - name: A changed file must be modelled, and decay must be discharged
         run: |
-          git diff --name-only origin/main...HEAD > /tmp/changed.txt || \
+          # INV-026: this gate exits 2 when it was handed nothing to examine, so
+          # the diff has to be right rather than merely succeed. On a push to main
+          # `origin/main...HEAD` is a branch against itself and walks zero files.
+          git diff --name-only origin/main...HEAD > /tmp/changed.txt || true
+          if [ ! -s /tmp/changed.txt ]; then
             git diff --name-only HEAD~1 HEAD > /tmp/changed.txt
+          fi
+          test -s /tmp/changed.txt || { echo "no changed paths could be computed"; exit 1; }
           traceos ratchet examples/traceos-itself \
             --changed-from /tmp/changed.txt --scope traceos/ \
             --decay-scope traceos/ --decay-scope tests/ --decay-scope docs/ \

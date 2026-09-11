@@ -122,6 +122,23 @@ Found twice from opposite directions before it was written down: a diff path in 
 wrong coordinates landing in `unknown`, and a decay obligation vanishing with its
 artifact. Both invisible.
 
+## INV-026 EMPTY-SCAN-IS-NOT-A-PASS
+
+A gate has **three** outcomes: clean, violated, could not establish. Two-valued gates
+round "I examined nothing" to clean, every time.
+
+Iterate the model, then ask scope per claim — never iterate the scope and ask the
+model. The denominator is the model's artifacts and assertions, never the diff's file
+count. Zero there means the scope names nothing the model knows about, and that must
+fail closed: a mistyped `--scope` would otherwise make the gate green forever.
+
+`ratchet` exits **2** when its scope matches no artifact, when its decay scope matches
+no assertion, or when it was handed a changed set with nothing in it.
+
+A claim whose artifact left the scope is still in the model and still in the
+denominator. It cannot be observed, and unobservable is a *result* — record it as
+`inconclusive`, which is already the vocabulary, rather than letting it vanish.
+
 ## INV-012 NO-PERCENT-COVERAGE
 
 **Never report a percentage. Never draw a green 100% bar.**

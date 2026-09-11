@@ -761,6 +761,36 @@ nothing were known about the file, and an artifact moving out of a decay scope m
 its discharge obligation disappear rather than lapse. Both were invisible. Neither
 was a wrong answer the reader could see.
 
+### 13.0.3 INV-026 EMPTY-SCAN-IS-NOT-A-PASS
+
+A gate MUST have three outcomes: clean, violated, and **could not establish**.
+
+A gate with two outcomes has to round *"I examined nothing"* into one of them, and
+every implementation rounds it to clean. A mistyped `--scope`, an absent baseline, a
+diff computed against the wrong ref — each produces a green check that looked at no
+files at all.
+
+**Iterate the model, then ask scope per claim. Never iterate the scope and ask the
+model.** The denominator is the model's own artifacts and assertions, never the
+diff's file count. Zero in that denominator means the scope names nothing the model
+knows about, which is exactly the state that must fail closed.
+
+```
+exit 0   examined, clean
+exit 1   examined, violated
+exit 2   could not establish - do not read as clean
+```
+
+A claim whose artifact has left the gated scope has not gone away; it is still in the
+model and still in the denominator. What changed is that it can no longer be
+observed, and *unobservable* is a result, not an absence — `inconclusive` is already
+the vocabulary for it (§6.2).
+
+Reported elsewhere, in a layer that arrived at the same rule after hitting the shape
+four times: a scoped run that diffed a branch against itself walked zero files,
+printed its success line, and let 15 errors through a check that had examined
+nothing.
+
 ### 13.1 Declared versus measured
 
 `coverage_declared: complete | partial | stub` on a Flow is an authored claim and can
@@ -925,3 +955,4 @@ are enforced mechanically instead of by careful reading.
 | INV-023 | A changed file in scope must be modelled | 13.0 |
 | INV-024 | Decay must be discharged in the change that touches it | 13.0.1 |
 | INV-025 | A boundary reports what it excluded; it never reports silence | 13.0.2 |
+| INV-026 | A gate has three outcomes; an empty scan is not a pass | 13.0.3 |

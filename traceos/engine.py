@@ -1098,6 +1098,19 @@ def ratchet(model: Model, changed: list[str], scope: list[str] | None = None) ->
     table = model.artifact_table()
     in_scope, mapped, unmapped = [], [], []
 
+    # INV-026. The denominator is the model, never the diff. A scope naming nothing
+    # the model knows about is an empty scan, and an empty scan is not a pass: a
+    # typo in --scope would otherwise make this gate green forever.
+    covered = [
+        declared
+        for declared in table
+        if not scope
+        or any(
+            _repo_path(declared, prefix).startswith(_norm_path(s).rstrip("/"))
+            for s in scope
+        )
+    ]
+
     for path in changed:
         clean = _norm_path(path)
         if scope and not any(clean.startswith(_norm_path(s).rstrip("/")) for s in scope):
@@ -1114,6 +1127,7 @@ def ratchet(model: Model, changed: list[str], scope: list[str] | None = None) ->
         "mapped": sorted(mapped),
         "unmapped": sorted(unmapped),
         "out_of_scope": sorted({_norm_path(c) for c in changed} - set(in_scope)),
+        "locators_in_scope": len(covered),
     }
 
 
@@ -1160,11 +1174,13 @@ def decay_ratchet(
         return any(clean.startswith(_norm_path(s).rstrip("/")) for s in scope)
 
     changed_clean = [_norm_path(c) for c in changed]
-    uncertain, touched, excluded = [], [], []
+    uncertain, touched, excluded, clean = [], [], [], []
     for aid, assertion in model.assertions.items():
         locators = [ev["locator"] for ev in assertion.get("evidence") or []]
         cited = [loc for loc in locators if in_scope(_repo_path(loc, prefix))]
         if computed_confidence(model, aid, at_time, git) != "uncertain":
+            if cited:
+                clean.append(aid)
             continue
         if not cited:
             if locators:
@@ -1189,6 +1205,7 @@ def decay_ratchet(
     grew = baseline is not None and len(uncertain) > baseline
     return {
         "scope": scope or ["(the whole model)"],
+        "assertions_in_scope": len(uncertain) + len(clean),
         "uncertain": sorted(uncertain),
         "baseline": baseline,
         "grew": grew,

@@ -357,6 +357,36 @@ def main() -> int:
                     "                Or delete it - an assertion nobody can verify "
                     "is abandoned, not stale."
                 )
+        # INV-026. Three outcomes, not two. A gate that can only say pass or fail
+        # has to round "I could not examine anything" to one of them, and every
+        # implementation rounds it to pass.
+        blind = []
+        if scope and not result["locators_in_scope"]:
+            blind.append(
+                f"--scope {', '.join(scope)} matches no artifact this model cites, "
+                f"so nothing was examined"
+            )
+        decay_scope = args.decay_scope or scope
+        if decay_scope and not decay["assertions_in_scope"]:
+            blind.append(
+                f"--decay-scope {', '.join(decay_scope)} matches no assertion, "
+                f"so no decay was examined"
+            )
+        if args.changed_from and not changed:
+            blind.append(
+                f"{args.changed_from} lists no changed path, so this gate was asked "
+                f"to examine a change and given none"
+            )
+        if blind:
+            for reason in blind:
+                print(f"  COULD NOT ESTABLISH  {reason}", file=sys.stderr)
+            print(
+                "  An empty scan is not a pass. Fix the scope or the changed set; "
+                "do not read this as clean.",
+                file=sys.stderr,
+            )
+            return 2
+
         failed = result["unmapped"] or decay["grew"] or decay["undischarged"]
         return 1 if failed else 0
 
