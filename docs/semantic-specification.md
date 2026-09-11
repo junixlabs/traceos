@@ -187,6 +187,46 @@ The validator MUST warn and MUST NOT silently promote a terminal node to an Outc
 
 ---
 
+### 4.6 Intent — INV-028
+
+An **Intent** says why a behavior was asked for. A Flow declares the Intents it serves
+with `realizes:`.
+
+```yaml
+intents:
+  - id: intent.confidence-must-be-able-to-fall
+    statement: >-
+      Confidence has to drop without anyone editing the model, or the model records
+      only that somebody was once confident.
+    record: { kind: decision, locator: "docs/decisions/003-confidence-is-derived.md#Decision" }
+```
+
+**INV-028 INTENT-IS-PROVENANCE.** An Intent is verified by provenance, never by truth.
+
+Nothing can establish that a sentence is genuinely why something was built. What *can*
+be established is whether the Intent names the **frozen record** that asked for it
+(§6.2.1), whether that record still resolves, and whether it has been superseded. Those
+are the only questions this layer answers, and the spec says so rather than letting a
+reader infer more from a green check.
+
+A model that tried to verify Intent by reading the code would be circular: the code is
+the thing the Intent is supposed to explain.
+
+**TraceOS defines no format for the record.** Architecture decision records, closed
+issues and commit trailers already exist, with established conventions and tooling to
+author and supersede them. What did not exist is anything that notices when an accepted
+decision has stopped matching the behavior — and a citation that stops resolving is the
+cheapest available signal of exactly that.
+
+Supersession reuses the identity ledger unchanged (INV-014): a decision replaced by a
+later decision is a `supersedes` with a reason, which is what an ADR's own
+"superseded by" line already means.
+
+`FLOW_WITHOUT_INTENT` is reported at `info` and never gates. Most behavior in a real
+system predates anyone writing the decision down, and a gate that demanded otherwise
+would be satisfied by invented intents — which is worse than none, for the same reason a
+rubber-stamped observation is worse than a missing one (§13.0.1).
+
 ## 5. Relationships
 
 ### 5.1 The matrix — INV-006
@@ -509,9 +549,14 @@ The lifecycle was mislabelled; the resolver is not missing anything.
 
 ### INV-018 NO-HEALTH
 
-Runtime health is out of scope for v0.1. TraceOS asks *what is the system's
-behavior*; health asks *is the running system healthy*. Uptime, latency, CPU, memory,
-availability and incident state belong to monitoring, which §Non-goals excludes.
+Runtime health is out of scope. TraceOS asks *what is the system's behavior*; health
+asks *is the running system healthy*. Uptime, latency, CPU, memory, availability and
+incident state belong to monitoring, which §Non-goals excludes.
+
+This invariant once carried a second question it should not have: *did the outcome this
+model declares actually occur*. That is verification, not monitoring, and §6.4.1 draws
+the line — the subject decides. Behavior evidenced by a runtime artifact is evidence;
+the machine's condition is not behavior.
 
 Two judgement scales remain, both DERIVED:
 
@@ -1052,6 +1097,56 @@ a symbol whose file had moved 21 times and whose symbol had moved once. The rema
 were re-observation requests for code the change never touched, which is the material a
 rubber stamp is made of (§13.0.1).
 
+### 6.4 An Outcome declares how it is checked — INV-027
+
+**INV-027 OUTCOME-DECLARES-ITS-CHECK.** An Outcome names the Assertion that checks
+whether it occurred, or it is reported as declaring none.
+
+```yaml
+outcomes:
+  - { id: purchase.completed,
+      states: [{ subject: order, value: confirmed }],
+      verified_by: assert.purchase.confirms-order }
+```
+
+**This is the only place in the model where reality can contradict it.** Intent and
+Behavior are both statements, and two statements can disagree only about words. An
+Outcome can be measured. So an observation that `refutes` an Outcome's check is the
+first machine-produced evidence that a claim is **wrong** rather than merely **stale** —
+which is the distinction every other mechanism in this specification is unable to make.
+
+| Finding | Level | Means |
+|---|---|---|
+| `OUTCOME_REFUTED` | error | the model says this outcome occurs; its own check says it did not |
+| `OUTCOME_CHECK_UNKNOWN` | error | `verified_by` names an Assertion this model does not have |
+| `OUTCOME_NEVER_CHECKED` | warn | a check is named and has never been observed |
+| `OUTCOME_NOT_VERIFIABLE` | warn | no check is declared |
+
+An Outcome with no check is reported, never failed. What is forbidden is silence: an
+unverifiable Outcome and a verified one must not read the same (INV-025).
+
+#### 6.4.1 What this does and does not admit about runtime
+
+INV-018 keeps runtime **health** out of scope permanently — uptime, latency, CPU,
+memory, availability and incident state belong to monitoring. That has not changed.
+
+What INV-027 admits is a different question, which INV-018 previously conflated with it:
+
+| Question | Status |
+|---|---|
+| *is the running system healthy* | out of scope, permanently (INV-018) |
+| *did the outcome this model declares actually occur* | in scope — it is verification, not monitoring |
+
+The boundary is the subject. An assertion about **the system's behavior**, evidenced by
+something a runtime produced, is evidence like any other, and `kind: runtime` has been a
+legal evidence kind since v0.1. An assertion about **the system's condition** is not
+behavior and does not enter.
+
+TraceOS defines no query language for this. Reading an indicator from a data source is a
+solved problem with an open specification of its own, and an Outcome's runtime evidence
+cites such a definition the way an Intent cites an ADR — by locator, never by
+reimplementation.
+
 ---
 
 ## Appendix A — Invariant index
@@ -1084,3 +1179,5 @@ rubber stamp is made of (§13.0.1).
 | INV-024 | Decay must be discharged in the change that touches it | 13.0.1 |
 | INV-025 | A boundary reports what it excluded; it never reports silence | 13.0.2 |
 | INV-026 | A gate has three outcomes; an empty scan is not a pass | 13.0.3 |
+| INV-027 | An Outcome declares the Assertion that checks it | 6.4 |
+| INV-028 | Intent is verified by provenance, never by truth | 4.6 |

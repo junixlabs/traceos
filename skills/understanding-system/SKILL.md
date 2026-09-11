@@ -85,6 +85,26 @@ qualifies only when something depends on it (INV-003).
 
 Events are semantic occurrences, emitted and listened to (INV-005).
 
+### 4a. Say why the Flow exists, when a record says so
+
+A Flow can declare the **Intents** it serves. An Intent is not a description of the
+behavior — it is the reason the behavior was asked for, and it cites the **frozen
+record** that asked: an ADR, a closed issue, a decision minute (§6.2.1).
+
+```yaml
+realizes:
+  - intent.confidence-must-be-able-to-fall
+```
+
+**Intent is verified by provenance, never by truth (INV-028).** The checkable questions
+are whether the record still resolves and whether it has been superseded. Whether the
+sentence is really the reason is not answerable, and trying to settle it by reading the
+code is circular — the code is what the Intent explains.
+
+Do not invent one. A Flow with no Intent is reported at `info` and never gated, because
+most behavior predates anyone writing the decision down. An invented Intent is worse
+than none, exactly as a rubber-stamped observation is worse than a missing one.
+
 ### 4b. Know which way each statement entered the model
 
 Every statement in the model arrived by one of four routes, and they are not

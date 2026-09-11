@@ -24,8 +24,10 @@ relationships:
   - { type: next, source: node.trace.tier, target: node.trace.gate }
   - { type: emits, source: node.trace.gate, target: event.change.traced }
   - { type: transitions_to, source: node.trace.gate, target: state.impact.tiered }
+realizes:
+  - intent.derived-is-never-authored
 outcomes:
-  - { id: trace.tiered, states: [{ subject: impact, value: tiered }] }
+  - { id: trace.tiered, states: [{ subject: impact, value: tiered }], verified_by: assert.trace.four-tiers }
 assertions:
   - id: assert.trace.four-tiers
     claim: "impact is reported in four tiers and never as a list of changed files"

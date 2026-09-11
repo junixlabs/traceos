@@ -112,6 +112,28 @@ Outcomes are explicit declarations bound to States (INV-015). If the new reality
 produces an outcome the Flow does not declare, update the declaration and the graph.
 Do not infer an Outcome from a terminal Node.
 
+### 7a. Reconcile Outcomes against what actually happened
+
+An Outcome names the Assertion that checks whether it occurred (INV-027), or is reported
+as declaring none. This is the only comparison in the whole loop where **reality can
+contradict the model** — Intent and Behavior are both statements, and two statements can
+disagree only about words.
+
+So a `refutes` here is not the same kind of event as a `refutes` anywhere else:
+
+| Elsewhere | On an Outcome's check |
+|---|---|
+| the evidence moved, the claim may be stale | the claim is **wrong**, and something acted on it |
+
+`OUTCOME_REFUTED` is an error and takes integrity to INVALID. Do not reconcile it by
+softening the claim. Find out what the system actually does, correct the Assertion, and
+leave the refuting observation in the log — it is the record of a model that was wrong
+in production, which is the most expensive kind of evidence there is and the only kind
+nothing else in this system can produce.
+
+An Outcome with no declared check is reported, never failed. Declare one when the
+behavior is load-bearing enough that being wrong about it would cost something.
+
 ### 8. Validate and recompute
 
 Run the validator: identity, matrix conformance, references, assertion consistency,

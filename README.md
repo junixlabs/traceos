@@ -11,9 +11,15 @@ neither can tell you that a behavior quietly stopped matching what it was for.
 
 | Layer | | Status |
 |---|---|---|
-| **Behavior** | the Flow graph, evidence, impact, erosion detection | **works today** — v0.1, modelled against itself in CI |
-| **Outcome** | an outcome carrying runtime evidence, able to refute a claim | **not built** — the layer that would detect a *wrong* claim rather than a stale one |
-| **Intent** | a behavior citing the frozen decision that asked for it | **not built** — verified by provenance, never by truth |
+| **Behavior** | the Flow graph, evidence, impact, erosion detection | **works** — modelled against itself in CI |
+| **Outcome** | an outcome names the check that says whether it occurred; a `refutes` there is an **error** | **mechanism works, value unproven** — INV-027, the only place reality can contradict the model |
+| **Intent** | a flow cites the frozen decision that asked for it, verified by provenance | **mechanism works, value unproven** — INV-028, citing the ADRs you already write rather than adding a format |
+
+"Value unproven" is not modesty. The mechanism is built, tested and enforced; what has
+**not** been run is the measurement that would justify it — take three incidents that
+actually happened and ask whether this would have caught any before they became one.
+That kill condition is written down in
+[ADR-015](docs/decisions/015-intent-behavior-outcome.md) and has not been answered.
 
 The direction, the four horizons and the measurement that would kill each of them are in
 [`docs/DIRECTION.md`](docs/DIRECTION.md). Nothing on that page is claimed as shipped.
