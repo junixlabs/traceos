@@ -411,6 +411,8 @@ def main() -> int:
                         "(never observed, or past the staleness window)"
                     )
                     print(f"            {aid}: {why}")
+                for ref, reason in decay.get("narrow_failures", {}).items():
+                    print(f"  NO NARROW {ref}: {reason}")
             for item in decay["undischarged"]:
                 print(
                     f"  UNDISCHARGED  {item['assertion']} is uncertain and cites "

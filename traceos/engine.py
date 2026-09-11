@@ -360,6 +360,18 @@ class Git:
             self._attrs_path = ""
         return self._attrs_path or None
 
+    def _note(self, path: str, anchor: str, reason: str) -> None:
+        """Why narrowing could not answer. INV-025: the boundary says what it excluded.
+
+        Three separate blockers this session were diagnosed only after a silent
+        fallback was made to speak - a gate reporting a count with no names, a
+        narrowing that cleared references without saying so, and this. A fallback
+        nobody can see is indistinguishable from a fallback that never happened.
+        """
+        if not hasattr(self, "narrow_notes"):
+            self.narrow_notes: dict[str, str] = {}
+        self.narrow_notes.setdefault(f"{path}#{anchor}", reason)
+
     def reachable(self, ref: str) -> bool:
         """Is this commit still in the history HEAD can see?
 
@@ -391,11 +403,13 @@ class Git:
         cannot be established is not a bound that found nothing (INV-026).
         """
         if not (ref and anchor):
+            self._note(path, anchor, "no ref or no anchor recorded")
             return None
         if not self.reachable(ref):
             # Unreachable is not unchanged. The caller falls back to the whole-file
             # hash, which is loud; answering False here would silently mark every
             # observation recorded before a squash merge as still verified.
+            self._note(path, anchor, f"observed_ref {ref[:10]} is not in this history")
             return None
         prefix = []
         attributes = self._attributes_file()
@@ -403,11 +417,18 @@ class Git:
             prefix = ["-c", f"core.attributesfile={attributes}"]
         probe = self._run(*prefix, "log", "-L", f":{anchor}:{path}", "--oneline", "-1")
         if probe is None:
+            self._note(
+                path,
+                anchor,
+                "git could not resolve the anchor "
+                + ("(attributes file unavailable)" if not attributes else "(no match)"),
+            )
             return None
         out = self._run(
             *prefix, "log", "-L", f":{anchor}:{path}", "--format=%H", "-s", f"{ref}..HEAD"
         )
         if out is None:
+            self._note(path, anchor, f"git log -L failed over {ref[:10]}..HEAD")
             return None
         return bool([line for line in out.splitlines() if line.strip()])
 
@@ -1424,6 +1445,9 @@ def decay_ratchet(
         "undischarged": sorted(touched, key=lambda t: t["assertion"]),
         "excluded": sorted(excluded),
         "narrowed": sorted(narrowed, key=lambda n: n["assertion"]),
+        "narrow_failures": dict(sorted(getattr(git, "narrow_notes", {}).items()))
+        if git
+        else {},
         "stale_by_assertion": {
             aid: stale_references(model, aid, git) for aid in sorted(uncertain)
         },
