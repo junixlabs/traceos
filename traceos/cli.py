@@ -340,9 +340,22 @@ def main() -> int:
             for item in decay["undischarged"]:
                 print(
                     f"  UNDISCHARGED  {item['assertion']} is uncertain and cites "
-                    f"{', '.join(item['references'])}, which this change edits.\n"
-                    f"                Re-observe it, or delete it - an assertion "
-                    f"nobody can verify is abandoned, not stale."
+                    f"{', '.join(item['references'])}, which this change edits."
+                )
+                print(
+                    f"                Check and re-observe: "
+                    f"{', '.join(item['stale']) or '(none stale)'}"
+                )
+                extra = [r for r in item["stale"] if r not in item["references"]]
+                if extra:
+                    print(
+                        f"                {len(extra)} of those went stale before this "
+                        f"change; the assertion stays uncertain until they are "
+                        f"checked too."
+                    )
+                print(
+                    "                Or delete it - an assertion nobody can verify "
+                    "is abandoned, not stale."
                 )
         failed = result["unmapped"] or decay["grew"] or decay["undischarged"]
         return 1 if failed else 0
