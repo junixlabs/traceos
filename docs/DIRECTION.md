@@ -66,7 +66,14 @@ what it excluded (INV-025).
 *Kills it:* erosion fires often enough on a healthy repository to be tuned out. Unmeasured
 — #10 is the number, and no horizon past this one is worth starting before it exists.
 
-### H2 — Outcome carries evidence
+### H2 — Outcome carries evidence — *mechanism built, value unproven*
+
+**Built (INV-027).** An Outcome names the Assertion that checks whether it occurred, or is
+reported as declaring none. A `refutes` on that check raises `OUTCOME_REFUTED` at error
+level and takes integrity to INVALID. What was missing was never the `runtime` evidence
+kind — it was anything that treated a refuted outcome differently from a stale reference.
+
+**Not built, and not a coding task:** the proof that it catches anything.
 
 Outcome today is `declared` and nothing else (INV-015): pure AUTHORED. It gains evidence
 the way an Assertion has evidence, including a `runtime` kind whose observation is the
@@ -83,7 +90,17 @@ the invariant currently conflates them.
 whether this mechanism would have caught any before they became incidents. **0 of 3 and
 the direction is vocabulary, not capability.**
 
-### H3 — Intent as provenance, never as truth
+### H3 — Intent as provenance, never as truth — *built*
+
+**Built (INV-028).** An Intent cites a frozen record (§6.2.1); `realizes:` on a Flow names
+the Intents it serves; `check_locators` checks that record's address like any other, so a
+decision whose record was moved or rewritten stops resolving. `FLOW_WITHOUT_INTENT` is
+reported at `info` and never gates.
+
+**Deliberately not built:** any format for the record. Research before building — ADRs,
+closed issues and commit trailers already exist with conventions and tooling, and what the
+ecosystem lacks is not another decision format but anything that notices when an accepted
+decision has stopped matching the behavior.
 
 An Intent entity whose evidence is a **frozen record** (§6.2.1) — an ADR, a closed issue,
 a commit message, a decision minute. Verification is provenance: *is this the record that
