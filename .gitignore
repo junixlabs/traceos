@@ -5,3 +5,4 @@ explore.html
 *.egg-info/
 .forge/
 site/
+CLAUDE.local.md
