@@ -1,5 +1,61 @@
 # Changelog
 
+## v0.3 — 2026-09-12
+
+The release that stopped guessing. Two questions that had governed the roadmap were
+measured, three defects an outside user would hit on day one were fixed, and two
+false-decay bugs in the week-old extractor were found by the mechanism auditing itself.
+
+### Measured
+
+- **What it costs to keep a model current (#10).** Unit: a *re-observation* — a reference
+  a change invalidated that someone must open and read. Median **11.5 before**
+  symbol-granular decay, **3.0 after**; a change used to force re-reading ~88% of the
+  model's references and now forces ~19%. Caveat kept in the open: n=7 after, one
+  repository, one author who wrote both the model and the code.
+- **Whether four impact tiers survive a dense graph (#5).** They do — and the opposite of
+  the hypothesis. Across synthetic graphs from 61 to 1,201 entities a change reaches a
+  median 15% down to 5%. They collapse on *small dense* models: 56–61% on the two
+  reference models. `impact()` now reports `share_reached` and prints **DID NOT
+  DISCRIMINATE** above 50%, which is a fact about the model rather than a finding about
+  the change.
+
+### Fixed — first run
+
+- **Ids use hyphens, keys use underscores (#41).** The validator printed a regex; it now
+  says the rule. That misunderstanding cost an outside user 22 errors.
+- **Five assertions on one subject produced ten errors and an INVALID model (#40).**
+  Nothing reads a claim, so "different string" was standing in for "incompatible
+  proposition". `CONTRADICTION` now requires observations that actually disagree;
+  differently-worded assertions on one subject raise one `SUBJECT_NOT_DISCRIMINATING`
+  warning. Measured on the reported case: 10 errors → 1 warning, INVALID → VALID.
+- **`integrity: UNCERTAIN` with no reason.** A clean-install walkthrough ended on a verdict
+  that said something was wrong and nothing about what. The verdict now carries why.
+
+### Fixed — the extractor shipped a day earlier
+
+- **`git log -L` reports a symbol's range at the last commit that touched it, not at
+  HEAD.** A 111-line insertion moved a function from line 717 to 747 and the hash was taken
+  over the wrong 68 lines. Now `git blame -L :<symbol> <file>`.
+- **git's funcname block includes the blank lines after a symbol**, so adding a function
+  after one read as an edit to it. Trailing blanks are dropped before hashing.
+
+Both were false positives in the safe direction. Both were still wrong: a checker that
+cries wolf is discharged by rubber stamp.
+
+### Modelled
+
+`examples/traceos-itself` gained `flow.account` — the Intent and Outcome layers v0.2
+shipped and did not model. INV-023 maps *files*, and the engine file was already mapped, so
+the gate never noticed (#51). Six flows, sixteen assertions, 47 evidence locators.
+
+### Known and deliberate
+
+Still unproven: ADR-015's kill condition — three real incidents, would this have caught any
+before they became one — has not been run. Still open and not closeable by code: no
+mechanism here detects a claim that is simply *wrong* (#42, #45), and the coverage ratchet
+is unusable as a gate on a repository whose churn is not the model (#43).
+
 ## v0.2 — 2026-09-12
 
 Behavior becomes accountable in two directions: back to the decision that asked for it,
