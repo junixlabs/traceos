@@ -1001,6 +1001,33 @@ the per-language funcname heuristics git already ships, and falls back to the
 whole-file hash when git cannot resolve the anchor — loud, never silent, because a
 bound that cannot be established is not a bound that found nothing (INV-026).
 
+#### 6.3.2 An observation must outlive the commit it was made on
+
+Narrowing first asked `git log -L :symbol:path <observed_ref>..HEAD`, which needs the
+branch's commits to still exist. **A squash merge deletes them.** Measured here: one
+merge left 7 of this repository's own 25 observed refs unreachable, and the next merge
+orphaned more. It reproduced only in CI, because a developer's clone keeps them alive in
+the reflog and in stale branches — so the failure was invisible exactly where the model
+was authored and total where it was checked.
+
+An observation therefore records `observed_symbol`: a hash of the cited symbol's text at
+the moment it was read. The line range is derived from git's own hunk header at check
+time and never stored, so INV-022 is untouched; what is stored is a hash of what the
+observer actually read, which is what an observation is for.
+
+Order of answers, strongest first:
+
+| | Needs history | Answers |
+|---|---|---|
+| whole-file hash unchanged | no | not changed |
+| `observed_symbol` unchanged | no | symbol not changed |
+| `git log -L <ref>..HEAD` | yes | whether the symbol moved in that range |
+| none of the above | — | could not establish → whole-file, loud, and it says why |
+
+`OBSERVED_REF_UNREACHABLE` reports observations made before this existed, and the
+discharge is to observe again — which is a real read at a commit that still exists, not
+a stamp.
+
 **The author now owes what file granularity used to cover by accident.** A claim must
 cite every symbol whose change could falsify it. Before narrowing, a claim spanning two
 functions but citing one still decayed when its sibling moved; after narrowing it does
