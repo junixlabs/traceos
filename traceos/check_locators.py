@@ -5,7 +5,7 @@ A reference is an address, not a fact (spec 6.1). Addresses rot: files move, sym
 get renamed, headings are rewritten. Nothing else in TraceOS notices, because the
 model never reads the artifact - it only records that somebody once did.
 
-    python3 tools/check_locators.py <model_dir> [--repo PATH]
+    python3 -m traceos.check_locators <model_dir> [--repo PATH]
 """
 
 from __future__ import annotations
@@ -14,8 +14,7 @@ import argparse
 import pathlib
 import sys
 
-sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
-import engine as T
+from . import engine as T
 
 
 def anchor_present(text: str, anchor: str) -> str:

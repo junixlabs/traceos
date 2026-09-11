@@ -26,7 +26,7 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: ${{ matrix.python }}
-      - run: pip install --disable-pip-version-check pyyaml jsonschema
+      - run: pip install --disable-pip-version-check .
       - name: Stress tests, invariants and tooling
         run: python3 tests/run_tests.py -v
 
@@ -40,28 +40,28 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
-      - run: pip install --disable-pip-version-check pyyaml jsonschema
+      - run: pip install --disable-pip-version-check .
       - name: examples/ecommerce
         run: |
-          python3 tools/traceos.py validate examples/ecommerce \
+          traceos validate examples/ecommerce \
             --repo-files examples/ecommerce/repo-files.txt
       - name: examples/traceos-itself — TraceOS modelling TraceOS
         run: |
           git ls-files '*.py' '*.md' '*.json' \
             | grep -v '^examples/traceos-itself/' > /tmp/repo-files.txt
-          python3 tools/traceos.py validate examples/traceos-itself \
+          traceos validate examples/traceos-itself \
             --repo-files /tmp/repo-files.txt --repo .
       - name: Every evidence locator must point at something that exists
-        run: python3 tools/check_locators.py examples/traceos-itself
+        run: python3 -m traceos.check_locators examples/traceos-itself
       - name: The Pages site renders
-        run: python3 tools/site.py --out /tmp/site --repo .
+        run: python3 -m traceos.site --out /tmp/site --repo .
       - name: A changed file must be modelled, and decay must be discharged
         run: |
           git diff --name-only origin/main...HEAD > /tmp/changed.txt || \
             git diff --name-only HEAD~1 HEAD > /tmp/changed.txt
-          python3 tools/traceos.py ratchet examples/traceos-itself \
-            --changed-from /tmp/changed.txt --scope tools/ \
-            --decay-scope tools/ --decay-scope tests/ --decay-scope docs/ \
+          traceos ratchet examples/traceos-itself \
+            --changed-from /tmp/changed.txt --scope traceos/ \
+            --decay-scope traceos/ --decay-scope tests/ --decay-scope docs/ \
             --decay-scope skills/ --decay-baseline 0 --repo .
 
   lint:
@@ -74,14 +74,14 @@ jobs:
           python-version: "3.12"
       - run: pip install --disable-pip-version-check ruff jsonschema pyyaml
       - name: ruff
-        run: ruff check tools tests
+        run: ruff check traceos tests
       - name: ruff format
-        run: ruff format --check tools tests
+        run: ruff format --check traceos tests
       - name: JSON Schema is itself valid
         run: |
           python3 - <<'PY'
           import json, jsonschema
-          s = json.load(open("schema/traceos.schema.json"))
+          s = json.load(open("traceos/schema/traceos.schema.json"))
           jsonschema.Draft202012Validator.check_schema(s)
           print("schema ok")
           PY
@@ -96,4 +96,4 @@ jobs:
           python-version: "3.12"
       - run: pip install --disable-pip-version-check pyyaml
       - name: Every invariant is defined, cited and enforced
-        run: python3 tools/check_docs.py
+        run: python3 -m traceos.check_docs

@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
 """TraceOS v0.1 engine: model, validation, resolution, impact, coverage.
 
-Imported by tools/traceos.py (the command line) and tools/explore.py (the HTML
+Imported by traceos/cli.py (the command line) and traceos/explore.py (the HTML
 view). Both depend on this module and neither depends on the other, so the
 dependency runs one way.
 
 Enforces the invariants of docs/semantic-specification.md that JSON Schema cannot
-express. Schema-expressible structure is checked against schema/traceos.schema.json.
+express. Schema-expressible structure is checked against
+traceos/schema/traceos.schema.json, resolved as packaged data so the engine
+works from an installed wheel as well as from a checkout.
 """
 
 from __future__ import annotations
@@ -17,6 +19,7 @@ import pathlib
 import re
 import shutil
 import subprocess
+from importlib import resources
 
 import yaml
 
@@ -26,7 +29,7 @@ except ImportError:
     jsonschema = None
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
-SCHEMA_PATH = ROOT / "schema" / "traceos.schema.json"
+SCHEMA_PATH = resources.files("traceos").joinpath("schema", "traceos.schema.json")
 
 CONFIDENCE_ORDER = {"uncertain": 0, "likely": 1, "confirmed": 2}
 DEFAULT_STALENESS_DAYS = 90
@@ -1312,6 +1315,20 @@ def suggest_externals(repo: pathlib.Path, files: list[str], limit: int = 15) -> 
     return [name for name, _ in ranked[:limit]]
 
 
+def _packaged_asset_dir(name: str) -> pathlib.Path | None:
+    """Locate a repository asset the engine ships beside itself.
+
+    A checkout carries the asset next to the package; an installed wheel ships
+    it under the package via the hatchling force-include mapping. Returns None
+    when neither is present, so a caller degrades instead of guessing.
+    """
+    source = ROOT / name
+    if source.is_dir():
+        return source
+    packaged = resources.files("traceos").joinpath(name)
+    return packaged if isinstance(packaged, pathlib.Path) and packaged.is_dir() else None
+
+
 def init(repo: pathlib.Path, out: pathlib.Path, name: str) -> list[str]:
     git = Git(repo)
     files = [f for f in (git._run("ls-files") or "").splitlines() if f]
@@ -1327,14 +1344,16 @@ def init(repo: pathlib.Path, out: pathlib.Path, name: str) -> list[str]:
     (out / "observations").mkdir(exist_ok=True)
     (out / "identity").mkdir(exist_ok=True)
 
-    # The scaffold must be runnable on its own - the printed next steps invoke
-    # tools/traceos.py from inside `out`.
-    for asset in ("tools", "schema", "skills"):
-        source = ROOT / asset
-        if source.is_dir() and not (out / asset).exists():
-            shutil.copytree(
-                source, out / asset, ignore=shutil.ignore_patterns("__pycache__", "*.pyc")
-            )
+    # The scaffold must run against the installed command, not against a frozen
+    # copy of the engine: tools/ and schema/ stay out, and only skills/ is
+    # copied, because an agent working in the target repository reads them there.
+    skills_dir = _packaged_asset_dir("skills")
+    if skills_dir is not None and not (out / "skills").exists():
+        shutil.copytree(
+            skills_dir,
+            out / "skills",
+            ignore=shutil.ignore_patterns("__pycache__", "*.pyc"),
+        )
 
     def write(rel: str, text: str) -> None:
         target = out / rel
