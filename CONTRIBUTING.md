@@ -56,7 +56,22 @@ Every test in this repository was falsified before being trusted: the bug it gua
 was reintroduced and the suite had to fail in the right place. Please do the same
 with a new one, and say in the PR what you broke to prove it.
 
-A test that only ever passes proves nothing.
+**A green check is evidence for exactly one proposition.** Where the fixture cannot
+represent the failure, a pass is not weak evidence — it is none, and it looks
+identical to a strong one. So ask what would have to be true for the assertion to go
+red, plant exactly that, and watch it go red naming its own rule. A test that cannot
+fail has not been written yet.
+
+This is not a style preference. Sabotaging the engine has twice found a bad test
+rather than a good one here. The most recent: a decay-denominator check pointed at a
+scope whose only assertion was already uncertain, so it could not tell an engine
+counting every assertion from one counting only the uncertain — it passed either way,
+and had been passing since it was written. The fix was to point it at a scope where
+the assertions are settled.
+
+The same rule arrived independently in an unrelated repository running a comparable
+layer. Two projects converging on it from opposite directions is worth more than
+either asserting it.
 
 ## Documentation
 
