@@ -385,6 +385,54 @@ class Git:
             return False
         return self._run("merge-base", "--is-ancestor", ref, "HEAD") is not None
 
+    def symbol_blob(self, path: str, anchor: str) -> str | None:
+        """Content hash of the named symbol as it stands now. No history required.
+
+        `git log -L :symbol:path -1` reports the most recent commit that touched the
+        symbol, and its hunk header carries the symbol's line range *at HEAD*. The
+        range is derived here and never stored, so INV-022 is untouched - what is
+        stored is a hash of the text, which is what an observation is entitled to
+        record about an artifact it just read.
+
+        This is what makes an observation survive a squash merge. Asking
+        `<observed_ref>..HEAD` needs the branch's commits to still exist, and a squash
+        replaces them: measured here, one merge orphaned 7 of 25 observed refs, and
+        the next merge orphaned more. A content hash has no such dependency.
+        """
+        prefix = []
+        attributes = self._attributes_file()
+        if attributes:
+            prefix = ["-c", f"core.attributesfile={attributes}"]
+        out = self._run(*prefix, "log", "-L", f":{anchor}:{path}", "-1", "--format=%x00")
+        if not out:
+            return None
+        lo = hi = None
+        for line in out.splitlines():
+            if line.startswith("@@"):
+                try:
+                    plus = line.split("+", 1)[1].split(" ", 1)[0]
+                except IndexError:
+                    continue
+                start, _, count = plus.partition(",")
+                try:
+                    lo = int(start)
+                    hi = lo + (int(count) if count else 1) - 1
+                except ValueError:
+                    return None
+        if lo is None:
+            return None
+        target = (self.repo / _norm_path(path)) if self.repo else None
+        if target is None or not target.is_file():
+            return None
+        try:
+            lines = target.read_text(encoding="utf-8", errors="replace").splitlines()
+        except OSError:
+            return None
+        body = "\n".join(line.rstrip() for line in lines[lo - 1 : hi])
+        if not body.strip():
+            return None
+        return hashlib.sha1(body.encode("utf-8")).hexdigest()
+
     def symbol_changed_since(self, ref: str, path: str, anchor: str) -> bool | None:
         """Did the named symbol change, rather than the file that contains it?
 
@@ -439,6 +487,7 @@ class Git:
         blob: str | None = None,
         norm_blob: str | None = None,
         anchor: str | None = None,
+        symbol_blob: str | None = None,
     ) -> bool | None:
         """spec 6.3 artifact_changed_since. None means it could not be determined.
 
@@ -459,6 +508,10 @@ class Git:
                 if current_norm is not None and current_norm == norm_blob:
                     return False
             if anchor:
+                if symbol_blob:
+                    current_symbol = self.symbol_blob(path, anchor)
+                    if current_symbol is not None:
+                        return current_symbol != symbol_blob
                 narrowed = self.symbol_changed_since(ref, path, anchor)
                 if narrowed is not None:
                     return narrowed
@@ -796,6 +849,7 @@ def stale_references(
                 observation.get("observed_blob"),
                 observation.get("observed_norm"),
                 anchor or None,
+                observation.get("observed_symbol"),
             )
             if changed is True:
                 stale.append(reference)
@@ -932,6 +986,7 @@ def computed_confidence(
                     observation.get("observed_blob"),
                     observation.get("observed_norm"),
                     anchor or None,
+                    observation.get("observed_symbol"),
                 )
                 if changed is True:
                     return "uncertain"
@@ -1578,17 +1633,25 @@ def observe(
             f"to history, which a squash or rebase will invalidate (spec 6.3)"
         )
 
+    path_part, _, anchor = match.partition("#")
     entry = {
         "assertion": assertion_id,
         "reference": match,
         "observed_at": at_time.isoformat().replace("+00:00", "Z"),
         "observed_ref": ref,
         "observed_blob": blob,
-        "observed_norm": git.normalised_blob(match.split("#", 1)[0]),
+        "observed_norm": git.normalised_blob(path_part),
         "supports": supports,
         "observer": observer,
         "kind": kind or declared[match]["kind"],
     }
+    # Ref-independent narrowing. Without it, decay can only ask which symbol moved by
+    # walking `observed_ref..HEAD`, and a squash merge deletes that ref: measured here,
+    # one merge orphaned 7 of 25 observations and the next orphaned more.
+    if anchor:
+        symbol = git.symbol_blob(path_part, anchor)
+        if symbol:
+            entry["observed_symbol"] = symbol
     out_dir = model_dir / "observations"
     out_dir.mkdir(exist_ok=True)
     with (out_dir / f"{at_time:%Y-%m}.jsonl").open("a", encoding="utf-8") as fh:

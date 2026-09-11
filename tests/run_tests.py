@@ -1296,6 +1296,30 @@ def tool_symbol_decay():
             [n["assertion"] for n in decay["narrowed"]] == ["assert.example.works"],
             str(decay["narrowed"]),
         )
+
+        # Ref-independent narrowing: the observation must survive its own commit
+        # being rewritten, because a squash merge does exactly that. Measured on this
+        # repository, one squash orphaned 7 of 25 observed refs.
+        sym_before = git.symbol_blob("mod.py", "alpha")
+        run("checkout", "-q", "--orphan", "rewritten")
+        run("add", "-A")
+        run("commit", "-qm", "history rewritten, every old commit orphaned")
+        check(
+            "TOOL symbol decay",
+            "the old ref is now unreachable, as after a squash merge",
+            git.reachable(head) is False,
+        )
+        check(
+            "TOOL symbol decay",
+            "a content hash still narrows when the ref is gone",
+            git.changed_since(head, "mod.py", blob, None, "alpha", sym_before) is False,
+        )
+        check(
+            "TOOL symbol decay",
+            "and it still reports a real change to the cited symbol",
+            git.changed_since(head, "mod.py", blob, None, "alpha", "0" * 40) is True,
+        )
+
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 

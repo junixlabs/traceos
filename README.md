@@ -1,10 +1,30 @@
 # TraceOS
 
+> ## Software behavior, accountable to intent.
+
+A claim about what a system does is **accountable** when it can be traced back to the
+decision that asked for it, and forward to an outcome capable of contradicting it.
+Nothing today does both: code annotations trace backward, monitoring traces forward, and
+neither can tell you that a behavior quietly stopped matching what it was for.
+
+**Where that stands, honestly:**
+
+| Layer | | Status |
+|---|---|---|
+| **Behavior** | the Flow graph, evidence, impact, erosion detection | **works today** — v0.1, modelled against itself in CI |
+| **Outcome** | an outcome carrying runtime evidence, able to refute a claim | **not built** — the layer that would detect a *wrong* claim rather than a stale one |
+| **Intent** | a behavior citing the frozen decision that asked for it | **not built** — verified by provenance, never by truth |
+
+The direction, the four horizons and the measurement that would kill each of them are in
+[`docs/DIRECTION.md`](docs/DIRECTION.md). Nothing on that page is claimed as shipped.
+
+---
+
 > **Trace before change. Reconcile after change.**
 
-A semantic layer that lets a coding agent see a system as behavior rather than as
-files — so it can work out what a change might affect *before* making it, and check
-whether the model is still true *after*.
+That is the part that runs. A semantic layer that lets a coding agent see a system as
+behavior rather than as files — so it can work out what a change might affect *before*
+making it, and check whether the model is still true *after*.
 
 A coding agent goes `search → modify → test`. It can change `PaymentService` without
 knowing that payment participates in purchase, refund, subscription, notification and
