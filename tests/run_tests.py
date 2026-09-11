@@ -1429,6 +1429,34 @@ def tool_explore():
     page = E.build(EXAMPLE, None, repo_files, contexts)
     model = T.Model(EXAMPLE)
 
+    # INV-027 / INV-028 in the one artifact a reader looks at first. Three outcome
+    # states must be distinguishable, not two: a checked outcome, a check nobody has
+    # run, and no check at all.
+    itself = E.build(ROOT / "examples" / "traceos-itself", ROOT, None, [{}])
+    check(
+        "TOOL explore",
+        "a Flow's Intents are rendered, labelled as provenance not truth",
+        "provenance, never truth" in itself and "intent.a-view-is-not-a-source" in itself,
+    )
+    check(
+        "TOOL explore",
+        "an outcome shows the check that verifies it",
+        'class="conf confirmed">' in itself or "checked</span>" in itself,
+    )
+    check(
+        "TOOL explore",
+        "a Flow with no Intent says so rather than rendering an empty list",
+        "no Intent declares why this Flow exists" in itself,
+    )
+    # The third state, which traceos-itself no longer has: an outcome nobody checks.
+    # Asserting only against a model where every outcome is checked is a test that
+    # cannot fail for the case it is named after.
+    check(
+        "TOOL explore",
+        "an outcome with no declared check is drawn differently, not omitted",
+        "no check declared" in page,
+    )
+
     embedded = json.loads(re.search(r"const IMPACT = (\{.*?\});\n", page, re.S).group(1))
     drifted = [
         loc for loc, result in embedded.items() if T.impact(model, [loc]) != result

@@ -236,14 +236,55 @@ def build(
     for fid, flow in ordered:
         trig = flow.get("trigger", {})
         trig_text = trig.get("ref") or trig.get("semantic") or trig.get("actor") or ""
+
+        def outcome_check(outcome: dict) -> str:
+            """INV-027 rendered as three states, never two.
+
+            A declared check, a declared check nobody has run, and no check at all are
+            different situations, and an explorer that drew them the same way would be
+            the silent boundary INV-025 forbids - in the one place a reader looks first.
+            """
+            verified_by = outcome.get("verified_by")
+            if not verified_by:
+                return '<span class="pill nocheck">no check declared</span>'
+            conf = conf_of(verified_by) if verified_by in model.assertions else None
+            if conf is None:
+                return (
+                    f'<span class="pill refuted">check missing: {e(verified_by)}</span>'
+                )
+            latest = T.latest_observation(model, verified_by)
+            if latest is None:
+                return (
+                    f'<span class="pill nocheck">never checked</span> '
+                    f'<span class="mono dim">{e(verified_by)}</span>'
+                )
+            if latest.get("supports") == "refutes":
+                return (
+                    f'<span class="pill refuted">REFUTED</span> '
+                    f'<span class="mono dim">{e(verified_by)}</span>'
+                )
+            return (
+                f'<span class="conf {conf}">{CONF_GLYPH[conf]} checked</span> '
+                f'<span class="mono dim">{e(verified_by)}</span>'
+            )
+
         outcomes = "".join(
             f'<li><span class="mono">{e(o["id"])}</span> → '
             + ", ".join(
                 f"<code>{e(s['subject'])}={e(str(s['value']))}</code>"
                 for s in o.get("states") or []
             )
+            + f"<br>{outcome_check(o)}"
             + "</li>"
             for o in flow.get("outcomes") or []
+        )
+
+        intents = "".join(
+            f'<li><span class="mono dim">{e(iid)}</span><br>'
+            f"{e((model.intents.get(iid) or {}).get('statement', '(not declared)'))}"
+            f'<br><span class="pill rec">{e(((model.intents.get(iid) or {}).get("record") or {}).get("locator", "no record"))}</span>'
+            "</li>"
+            for iid in flow.get("realizes") or []
         )
         assertions = "".join(
             f'<li><span class="conf {conf_of(a["id"])}">'
@@ -270,7 +311,9 @@ def build(
   </header>
   <div class="graph">{flow_svg(model, fid)}</div>
   <div class="cols">
-    <div><h4>Outcomes <span class="dim">declared, bound to states</span></h4>
+    <div><h4>Why <span class="dim">provenance, never truth (INV-028)</span></h4>
+      <ul>{intents or '<li class="dim">no Intent declares why this Flow exists</li>'}</ul></div>
+    <div><h4>Outcomes <span class="dim">and what checks them (INV-027)</span></h4>
       <ul>{outcomes or '<li class="dim">none declared</li>'}</ul></div>
     <div><h4>Assertions</h4><ul>{assertions or '<li class="dim">none</li>'}</ul></div>
   </div>
@@ -454,6 +497,9 @@ h4 {{ font-size:12px; margin:0 0 6px; text-transform:uppercase;
   border:1px solid var(--line); color:var(--muted); white-space:nowrap }}
 .pill.current, .pill.ok, .pill.confirmed {{ color:var(--ok); border-color:var(--ok) }}
 .pill.likely, .pill.warn, .pill.cov {{ color:var(--warn); border-color:var(--warn) }}
+.pill.refuted {{ color:var(--err); border-color:var(--err); font-weight:600 }}
+.pill.nocheck {{ color:var(--muted); border-style:dashed }}
+.pill.rec {{ color:var(--muted); font-size:10px }}
 .pill.uncertain, .pill.bad, .pill.error, .pill.err {{ color:var(--err);
   border-color:var(--err) }}
 .graph {{ overflow-x:auto; padding:6px 0 10px; border-bottom:1px solid var(--line);
