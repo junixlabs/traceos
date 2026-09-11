@@ -12,6 +12,12 @@ lands cleanly in its own tier.
 | **Evidence Reference** | a pointer: an artifact symbol, a test name, a config key, an external contract | AUTHORED, on the Assertion | yes — correct it, re-anchor it after a rename |
 | **Evidence Observation** | the *act of checking*, at a particular moment | RECORDED, append-only | no |
 
+A **record** is true about its moment and never becomes wrong. A **claim** is about
+now, and can. Only the claim owes a re-check — but prose written *from* a record
+turns a historical statement into a present-tense one, and the record cannot warn
+anybody, because it was never wrong. That copy is the one that rots, and every
+identifier in it can still resolve while the sentence is false.
+
 A reference is only an address. It cannot tell you whether what lives there still
 supports the claim. An observation is a fact about a moment, and it stays true
 forever as a statement about that moment.

@@ -272,6 +272,28 @@ A reference is a pointer; by itself it cannot say whether it still supports the
 claim. An observation is a fact about a moment and remains true forever as a
 statement about that moment.
 
+#### 6.2.1 A claim copied out of a record inherits staleness the record never had
+
+A **record** — an observation, a changelog entry, a release note — is true about
+its moment and never becomes wrong. A **claim** is about now, and can. Those are
+different objects and the obligation to re-verify belongs only to the second.
+
+The failure this creates is quiet and worth naming. Prose written *from* a record
+turns a historical statement into a present-tense one, and the record cannot warn
+anyone: it was never wrong. The copy is wrong, the original is not, and nothing
+connects them.
+
+Measured in an unrelated repository: a changelog entry accurately described a rule
+as of the day it was written. A later change reversed that rule and three source
+annotations were updated to match. The changelog was not — correctly, since it
+records what shipped — but a flow page had been written from it, and that page now
+told readers the reversed rule was current. **Every identifier in the sentence still
+resolved.** No anchor check could reach it.
+
+This is the case an evidence resolver cannot cover, and it is the one an Assertion
+with observations exists for: the claim is dated, its support is dated, and the
+distance between them is visible.
+
 #### INV-022 LOCATOR-BY-SYMBOL
 
 ```yaml
